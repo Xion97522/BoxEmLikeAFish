@@ -20548,9 +20548,10 @@ pc.script.createLoadingScreen((app) => {
     'use strict';
 
     // ── Config ────────────────────────────────────────────────────────
+    // Spawn Y = hip height above ground (Mixamo skeleton origin is at the hips ~0.95 m up)
     var SPAWNS = [
-        [8,  0.55,  8],  [-8,  0.55,  6],  [12, 0.55, -4],
-        [-10,0.55, -5],  [3,   0.55, 15],  [-4, 0.55, 13],
+        [8,  0.95,  8],  [-8,  0.95,  6],  [12, 0.95, -4],
+        [-10,0.95, -5],  [3,   0.95, 15],  [-4, 0.95, 13],
     ];
     var ENEMY_HP      = 100;
     var DETECT_RANGE  = 18;
@@ -20561,9 +20562,11 @@ pc.script.createLoadingScreen((app) => {
     var ATTACK_RATE   = 1.3;   // seconds between hits
     var RESPAWN_TIME  = 9;
 
-    // Model visual scale — FBX was authored in cm, so 0.01 → metres
-    var MODEL_SCALE    = 0.012;
-    var MODEL_Y_OFFSET = -0.55;   // shift feet to ground level
+    // GLB is already in metres (Three.js FBXLoader applies the cm→m conversion).
+    // Scale = 1.0 gives a ~1.8 m tall character.
+    // Y offset moves the visual mesh so feet sit on the ground (origin is at hips).
+    var MODEL_SCALE    = 1.0;
+    var MODEL_Y_OFFSET = -0.95;   // shift hips-origin down so feet land on y=0
 
     var enemies   = [];
     var playerHP  = 100;
@@ -20661,8 +20664,8 @@ pc.script.createLoadingScreen((app) => {
                     var dx = dir.x + ox, dy = dir.y + oy, dz = dir.z;
                     var len = Math.sqrt(dx*dx + dy*dy + dz*dz);
                     if (len > 0) { dx /= len; dy /= len; dz /= len; }
-                    var hitHead = raySphere(origin, {x:dx,y:dy,z:dz}, en.headWorldPos(), 0.22);
-                    var hitBody = raySphere(origin, {x:dx,y:dy,z:dz}, en.bodyWorldPos(), 0.42);
+                    var hitHead = raySphere(origin, {x:dx,y:dy,z:dz}, en.headWorldPos(), 0.18);
+                    var hitBody = raySphere(origin, {x:dx,y:dy,z:dz}, en.bodyWorldPos(), 0.38);
                     if (hitHead || hitBody) {
                         en.onHit(hitHead ? 60 : 22);
                         break;
@@ -20838,7 +20841,8 @@ pc.script.createLoadingScreen((app) => {
 
         en.bodyWorldPos = function () { return en.body.getPosition(); };
         en.headWorldPos = function () {
-            return en.body.getPosition().clone().add(new pc.Vec3(0, 0.78, 0));
+            // body entity is at hip height (~0.95m); head is ~0.85m above hips
+            return en.body.getPosition().clone().add(new pc.Vec3(0, 0.85, 0));
         };
 
         // ── Animation helper ───────────────────────────────────────────
@@ -21003,7 +21007,7 @@ pc.script.createLoadingScreen((app) => {
                 var camComp = cam.camera;
                 if (!camComp) return;
                 var headPos = en.headWorldPos();
-                headPos.y += 0.22;
+                headPos.y += 0.28;   // float bar above the head
                 var sc = new pc.Vec4();
                 camComp.worldToScreen(headPos, sc);
                 if (sc.z < 0 || sc.z > 1) { en.hpBar.style.display = 'none'; return; }
