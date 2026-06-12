@@ -331,42 +331,244 @@ function getSpawnPositions(count) {
 }
 
 function buildEnemyMesh(type) {
-    const d   = EDATA[type];
-    const geo = new THREE.BoxGeometry(d.r*2, d.h, d.r*2);
-    const mat = new THREE.MeshPhongMaterial({
-        color:    d.color,
-        emissive: d.emissive,
-        emissiveIntensity: 0.3,
-        shininess: 20,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.castShadow = true;
+    const d     = EDATA[type];
+    const h     = d.h;
+    const r     = d.r;
+    const group = new THREE.Group();
+    group.userData.isEnemyMesh = true;
 
-    // Eyes (glow)
-    const eyeGeo = new THREE.SphereGeometry(0.06, 6, 4);
-    const eyeMat = new THREE.MeshBasicMaterial({ color:0xff4444 });
-    const eyeL   = new THREE.Mesh(eyeGeo, eyeMat);
-    const eyeR   = new THREE.Mesh(eyeGeo, eyeMat);
-    eyeL.position.set(-d.r*0.45, d.h*0.3, -d.r*0.8);
-    eyeR.position.set( d.r*0.45, d.h*0.3, -d.r*0.8);
-    mesh.add(eyeL); mesh.add(eyeR);
+    // ── Per-type colour palette ───────────────────────────────────────
+    const bodyCol   = d.color;
+    const armorCol  = type === 'scout' ? 0x770000
+                    : type === 'grunt' ? 0x1a1a1a
+                    :                    0x050005;
+    const accentCol = type === 'scout' ? 0xff7700
+                    : type === 'grunt' ? 0x555555
+                    :                    0x440011;
+    const eyeCol    = type === 'heavy' ? 0xff6600 : 0xff2200;
 
-    // Health bar (plane above enemy)
+    function mkMat(col, emi=0x000000, emiI=0.2) {
+        return new THREE.MeshPhongMaterial({ color:col, emissive:emi, emissiveIntensity:emiI, shininess:35 });
+    }
+    function part(geo, material, px, py, pz, rx=0, ry=0, rz=0) {
+        const m = new THREE.Mesh(geo, material);
+        m.position.set(px, py, pz);
+        m.rotation.set(rx, ry, rz);
+        m.castShadow   = true;
+        m.userData.root = group;
+        group.add(m);
+        return m;
+    }
+
+    // ── Skeleton measurements (all relative to group origin = h/2 up) ─
+    const legH    = h * 0.45;
+    const torsoH  = h * 0.35;
+    const neckH   = h * 0.05;
+    const headR   = h * 0.12;
+
+    const legBot  = -h / 2;
+    const legTop  = legBot + legH;           // torso starts here
+    const torsoMid = legTop + torsoH / 2;
+    const torsoTop = legTop + torsoH;
+    const headY   = torsoTop + neckH + headR * 1.1;
+
+    const thighH  = legH * 0.52;
+    const shinH   = legH * 0.48;
+    const legSep  = r * 0.48;
+    const thighR  = r * 0.175;
+    const shinR   = r * 0.135;
+
+    const torsoW  = r * 1.75;
+    const torsoD  = r * 1.05;
+    const armR    = r * 0.12;
+    const armH    = torsoH * 0.88;
+
+    const bodyMat   = mkMat(bodyCol,  d.emissive, 0.18);
+    const armorMat  = mkMat(armorCol, 0x000000,   0.08);
+    const accentMat = mkMat(accentCol, accentCol, 0.7);
+
+    // ── Legs ─────────────────────────────────────────────────────────
+    for (const s of [-1, 1]) {
+        const lx = legSep * s;
+        // thigh
+        part(new THREE.CylinderGeometry(thighR, thighR*0.88, thighH, 7), bodyMat,
+             lx, legBot + thighH/2, 0);
+        // knee cap
+        part(new THREE.SphereGeometry(shinR*1.15, 6, 5), armorMat,
+             lx, legBot + thighH, 0);
+        // shin
+        part(new THREE.CylinderGeometry(shinR*0.88, shinR, shinH, 7), bodyMat,
+             lx, legBot + thighH + shinH/2, 0);
+        // boot
+        part(new THREE.BoxGeometry(thighR*2.4, shinH*0.17, thighR*3.2), armorMat,
+             lx, legBot + shinH*0.085, thighR*0.55);
+        // shin guard
+        if (type !== 'scout') {
+            part(new THREE.BoxGeometry(shinR*1.6, shinH*0.42, shinR*0.3), armorMat,
+                 lx, legBot + thighH + shinH*0.35, -shinR*1.1);
+        }
+    }
+
+    // ── Pelvis ───────────────────────────────────────────────────────
+    part(new THREE.BoxGeometry(torsoW*0.82, torsoH*0.12, torsoD*0.78), bodyMat,
+         0, legTop + torsoH*0.04, 0);
+
+    // ── Torso ────────────────────────────────────────────────────────
+    part(new THREE.BoxGeometry(torsoW, torsoH, torsoD), bodyMat,
+         0, torsoMid, 0);
+
+    // Chest plate (grunt + heavy)
+    if (type !== 'scout') {
+        const cpW = type === 'heavy' ? torsoW*0.88 : torsoW*0.80;
+        const cpH = type === 'heavy' ? torsoH*0.65 : torsoH*0.55;
+        part(new THREE.BoxGeometry(cpW, cpH, torsoD*0.18), armorMat,
+             0, torsoMid + torsoH*0.06, -torsoD*0.5);
+        // Ribbing lines on chest plate
+        for (let i = -1; i <= 1; i++) {
+            part(new THREE.BoxGeometry(torsoW*0.06, cpH*0.85, torsoD*0.22), accentMat,
+                 (torsoW*0.22)*i, torsoMid + torsoH*0.06, -torsoD*0.5);
+        }
+    }
+
+    // Spine ridge (scout only — slick back panel)
+    if (type === 'scout') {
+        part(new THREE.BoxGeometry(torsoW*0.18, torsoH*0.75, torsoD*0.18), armorMat,
+             0, torsoMid, torsoD*0.5);
+    }
+
+    // Chest accent stripe (all types)
+    part(new THREE.BoxGeometry(torsoW*0.10, torsoH*0.55, torsoD*0.18), accentMat,
+         0, torsoMid + torsoH*0.05, -torsoD*0.5);
+
+    // Shoulder pads (grunt + heavy)
+    if (type !== 'scout') {
+        const padW = type === 'heavy' ? r*0.65 : r*0.38;
+        const padH = type === 'heavy' ? r*0.50 : r*0.30;
+        const padD = torsoD * 0.88;
+        for (const s of [-1, 1]) {
+            part(new THREE.BoxGeometry(padW, padH, padD), armorMat,
+                 (torsoW/2 + padW/2 - 0.01)*s, torsoTop - padH*0.45, 0);
+            // Pad edge trim
+            part(new THREE.BoxGeometry(padW*0.9, padH*0.12, padD*1.02), accentMat,
+                 (torsoW/2 + padW/2 - 0.01)*s, torsoTop - padH*0.88, 0);
+        }
+    }
+
+    // Scout slim chest trim
+    if (type === 'scout') {
+        part(new THREE.BoxGeometry(torsoW*0.95, torsoH*0.08, torsoD*1.02), accentMat,
+             0, torsoTop - torsoH*0.08, 0);
+    }
+
+    // ── Arms ─────────────────────────────────────────────────────────
+    const armTopY = torsoTop - torsoH*0.04;
+    for (const s of [-1, 1]) {
+        const ax = (torsoW/2 + armR*1.3) * s;
+        // upper arm
+        part(new THREE.CylinderGeometry(armR, armR*0.82, armH*0.52, 7), bodyMat,
+             ax, armTopY - armH*0.52*0.5, 0);
+        // elbow
+        part(new THREE.SphereGeometry(armR*1.05, 6, 5), armorMat,
+             ax, armTopY - armH*0.52, 0);
+        // forearm
+        part(new THREE.CylinderGeometry(armR*0.82, armR*0.66, armH*0.48, 7), bodyMat,
+             ax, armTopY - armH*0.52 - armH*0.48*0.5, 0);
+        // fist / hand
+        part(new THREE.BoxGeometry(armR*2.2, armR*2.0, armR*2.2), armorMat,
+             ax, armTopY - armH*0.52 - armH*0.48 - armR, 0);
+    }
+
+    // ── Neck ─────────────────────────────────────────────────────────
+    part(new THREE.CylinderGeometry(headR*0.42, headR*0.54, neckH, 7), bodyMat,
+         0, torsoTop + neckH/2, 0);
+
+    // ── Head (type-specific) ─────────────────────────────────────────
+    if (type === 'scout') {
+        // Angular visor helmet
+        part(new THREE.BoxGeometry(headR*1.85, headR*1.95, headR*1.72), bodyMat,
+             0, headY, 0);
+        // Top crest
+        part(new THREE.BoxGeometry(headR*0.28, headR*0.55, headR*1.65), armorMat,
+             0, headY + headR*1.1, 0);
+        // Visor band
+        part(new THREE.BoxGeometry(headR*1.68, headR*0.44, headR*0.22), mkMat(0xff8800, 0xff5500, 1.2),
+             0, headY + headR*0.10, -headR*0.87);
+        // Side vents
+        for (const s of [-1, 1]) {
+            part(new THREE.BoxGeometry(headR*0.18, headR*0.55, headR*0.55), armorMat,
+                 headR*0.96*s, headY - headR*0.1, headR*0.4);
+        }
+    } else if (type === 'grunt') {
+        // Rounded military helmet
+        part(new THREE.SphereGeometry(headR, 9, 7), bodyMat, 0, headY, 0);
+        // Helmet brim
+        part(new THREE.CylinderGeometry(headR*1.22, headR*1.02, headR*0.22, 9), armorMat,
+             0, headY - headR*0.52, 0);
+        // Visor slit
+        part(new THREE.BoxGeometry(headR*1.02, headR*0.24, headR*0.18), mkMat(0xff2200, 0xff0000, 1.4),
+             0, headY + headR*0.04, -headR);
+        // Chin guard
+        part(new THREE.BoxGeometry(headR*0.95, headR*0.35, headR*0.22), armorMat,
+             0, headY - headR*0.52, -headR*0.9);
+        // Ear guards
+        for (const s of [-1, 1]) {
+            part(new THREE.BoxGeometry(headR*0.22, headR*0.62, headR*0.5), armorMat,
+                 headR*1.05*s, headY + headR*0.1, 0);
+        }
+    } else {
+        // Heavy — full-face armour slab
+        part(new THREE.BoxGeometry(headR*2.3, headR*2.3, headR*2.1), armorMat,
+             0, headY, 0);
+        // Face grille recessed
+        part(new THREE.BoxGeometry(headR*1.45, headR*0.72, headR*0.22), mkMat(0x080808),
+             0, headY - headR*0.08, -headR*1.0);
+        // Grill bars
+        for (let i = -1; i <= 1; i++) {
+            part(new THREE.BoxGeometry(headR*0.12, headR*0.60, headR*0.25), mkMat(0x1a1a1a),
+                 headR*0.48*i, headY - headR*0.08, -headR);
+        }
+        // Top intake vent
+        part(new THREE.BoxGeometry(headR*0.9, headR*0.18, headR*0.7), mkMat(0x1a1a1a),
+             0, headY + headR*1.1, -headR*0.3);
+        // Jaw flare
+        part(new THREE.BoxGeometry(headR*2.5, headR*0.28, headR*1.8), armorMat,
+             0, headY - headR*1.1, 0);
+        // Shoulder neck guard
+        part(new THREE.BoxGeometry(torsoW*1.05, torsoH*0.10, torsoD*0.95), armorMat,
+             0, torsoTop + neckH, 0);
+    }
+
+    // ── Eyes (glowing) ───────────────────────────────────────────────
+    const eyeGeo = new THREE.SphereGeometry(0.045, 6, 4);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: eyeCol });
+    const eyeZ   = -(type === 'heavy' ? headR*0.98 : headR*0.88);
+    const eyeYY  = headY + (type === 'grunt' ? headR*0.04 : headR*0.10);
+    const eyeSep = headR * 0.52;
+    for (const s of [-1, 1]) {
+        const e = new THREE.Mesh(eyeGeo, eyeMat);
+        e.position.set(eyeSep * s, eyeYY, eyeZ);
+        e.userData.root = group;
+        group.add(e);
+    }
+
+    // ── Health bar ───────────────────────────────────────────────────
     const barBgGeo = new THREE.PlaneGeometry(0.8, 0.08);
     const barBgMat = new THREE.MeshBasicMaterial({ color:0x222222, side:THREE.DoubleSide });
     const barBg    = new THREE.Mesh(barBgGeo, barBgMat);
-    barBg.position.set(0, d.h*0.5+0.25, 0);
+    barBg.position.set(0, h/2 + 0.25, 0);
     barBg.rotation.x = -Math.PI/2 + 0.6;
-    mesh.add(barBg);
+    barBg.userData.root = group;
+    group.add(barBg);
 
     const barFgGeo = new THREE.PlaneGeometry(0.8, 0.07);
     const barFgMat = new THREE.MeshBasicMaterial({ color:0x22dd22, side:THREE.DoubleSide });
     const barFg    = new THREE.Mesh(barFgGeo, barFgMat);
-    barFg.position.set(0, d.h*0.5+0.26, 0);
+    barFg.position.set(0, h/2 + 0.26, 0);
     barFg.rotation.x = -Math.PI/2 + 0.6;
-    mesh.add(barFg);
+    barFg.userData.root = group;
+    group.add(barFg);
 
-    return { mesh, barFg };
+    return { mesh: group, barFg };
 }
 
 function spawnEnemy(type, x, z) {
@@ -602,7 +804,8 @@ function shoot() {
             hitAny = true;
             // Find which enemy
             const hitMesh = hits[0].object;
-            const enemy = enemies.find(e => e.alive && (e.mesh === hitMesh || hitMesh.parent === e.mesh));
+            const rootMesh = hitMesh.userData.root || hitMesh.parent;
+            const enemy = enemies.find(e => e.alive && (e.mesh === hitMesh || e.mesh === rootMesh));
             if (enemy) {
                 damageEnemy(enemy, wd.dmg, hits[0].point);
             }
