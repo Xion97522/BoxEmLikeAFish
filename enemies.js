@@ -23,11 +23,12 @@
     var MODEL_SCALE    = 1.0;
     var MODEL_Y_OFFSET = -0.95;   // shift hips-origin down so feet land on y=0
 
-    var enemies   = [];
-    var playerHP  = 100;
-    var hpEl      = null;
-    var killsEl   = null;
-    var killCount = 0;
+    var enemies      = [];
+    var playerHP     = 100;
+    var hpEl         = null;
+    var killsEl      = null;
+    var killCount    = 0;
+    var metalTexture = null;   // loaded from /enemy-metal.webp
 
     // ── Asset handles ─────────────────────────────────────────────────
     var meatAsset   = null;
@@ -52,6 +53,28 @@
     // ── Init ──────────────────────────────────────────────────────────
     function init(app, cam) {
         buildHUD();
+
+        // ── Load metal texture ──────────────────────────────────────────
+        var metalImg       = new Image();
+        metalImg.crossOrigin = 'anonymous';
+        metalImg.onload    = function () {
+            try {
+                metalTexture = new pc.Texture(app.graphicsDevice, {
+                    format: pc.PIXELFORMAT_RGBA8,
+                    mipmaps: true,
+                    minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
+                    magFilter: pc.FILTER_LINEAR,
+                    addressU: pc.ADDRESS_REPEAT,
+                    addressV: pc.ADDRESS_REPEAT,
+                });
+                metalTexture.setSource(metalImg);
+                // Refresh any enemies that already spawned before texture finished
+                enemies.forEach(function (en) { applyMetalToEnemy(en); });
+            } catch (e) {
+                console.warn('[enemies] metal texture load error:', e);
+            }
+        };
+        metalImg.src = '/enemy-metal.webp';
 
         // Track how many assets are still loading
         var pending = 5;
@@ -196,6 +219,13 @@
                 body.addChild(modelEntity);
                 meshInstances = collectMeshInstances(modelEntity);
 
+                // Apply metal texture material (one instance per enemy)
+                if (metalTexture) {
+                    var mm = makeMetalMat();
+                    meshInstances.forEach(function (mi) { mi.material = mm; });
+                    bodyMat = mm;
+                }
+
                 // ── Add anim component and assign all clips ──────────────
                 var tracksAvailable = Object.keys(animTracks).length > 0;
                 if (tracksAvailable) {
@@ -237,9 +267,8 @@
         if (!modelEntity) {
             body.addComponent('render', { type: 'box' });
             body.setLocalScale(0.5, 1.1, 0.3);
-            bodyMat = new pc.StandardMaterial();
-            bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
-            bodyMat.update();
+            bodyMat = metalTexture ? makeMetalMat() : new pc.StandardMaterial();
+            if (!metalTexture) { bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08); bodyMat.update(); }
             applyMat(body, bodyMat);
 
             var head = new pc.Entity('en-head-' + idx);
@@ -372,7 +401,7 @@
                 mi.material.update();
             });
             if (en.bodyMat) {
-                en.bodyMat.diffuse  = new pc.Color(0.65, 0.08, 0.08);
+                en.bodyMat.diffuse  = new pc.Color(1.0, 1.0, 1.0);
                 en.bodyMat.emissive = new pc.Color(0, 0, 0);
                 en.bodyMat.update();
             }
@@ -532,6 +561,29 @@
     function applyMat(entity, mat) {
         if (entity.render && entity.render.meshInstances) {
             entity.render.meshInstances.forEach(function (mi) { mi.material = mat; });
+        }
+    }
+
+    function makeMetalMat() {
+        var m = new pc.StandardMaterial();
+        m.diffuse    = new pc.Color(1, 1, 1);
+        m.shininess  = 72;
+        if (metalTexture) m.diffuseMap = metalTexture;
+        m.update();
+        return m;
+    }
+
+    function applyMetalToEnemy(en) {
+        if (!metalTexture) return;
+        var m = makeMetalMat();
+        if (en.meshInstances && en.meshInstances.length) {
+            en.meshInstances.forEach(function (mi) { mi.material = m; });
+        }
+        if (en.bodyMat) {
+            en.bodyMat.diffuseMap = metalTexture;
+            en.bodyMat.update();
+        } else {
+            en.bodyMat = m;
         }
     }
 
