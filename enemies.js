@@ -1,4 +1,4 @@
-// enemies.js — Enemy AI system for PlayCanvas FPS
+// enemies.js — Enemy AI system for PlayCanvas FPS  (with skeletal animations)
 (function () {
     'use strict';
 
@@ -7,25 +7,29 @@
         [8,  0.55,  8],  [-8,  0.55,  6],  [12, 0.55, -4],
         [-10,0.55, -5],  [3,   0.55, 15],  [-4, 0.55, 13],
     ];
-    var ENEMY_HP       = 100;
-    var DETECT_RANGE   = 18;
-    var CHASE_SPEED    = 3.2;
-    var PATROL_SPEED   = 1.4;
-    var ATTACK_RANGE   = 2.0;
-    var ATTACK_DAMAGE  = 12;
-    var ATTACK_RATE    = 1.3;   // seconds between hits
-    var RESPAWN_TIME   = 9;
+    var ENEMY_HP      = 100;
+    var DETECT_RANGE  = 18;
+    var CHASE_SPEED   = 3.2;
+    var PATROL_SPEED  = 1.4;
+    var ATTACK_RANGE  = 2.0;
+    var ATTACK_DAMAGE = 12;
+    var ATTACK_RATE   = 1.3;   // seconds between hits
+    var RESPAWN_TIME  = 9;
 
-    // Visual scale of the meat model (tweak to taste)
+    // Model visual scale — FBX was authored in cm, so 0.01 → metres
     var MODEL_SCALE    = 0.012;
-    var MODEL_Y_OFFSET = -0.55; // shift model down so feet touch ground
+    var MODEL_Y_OFFSET = -0.55;   // shift feet to ground level
 
-    var enemies    = [];
-    var playerHP   = 100;
-    var hpEl       = null;
-    var killsEl    = null;
-    var killCount  = 0;
-    var meatAsset  = null;   // preloaded container asset
+    var enemies   = [];
+    var playerHP  = 100;
+    var hpEl      = null;
+    var killsEl   = null;
+    var killCount = 0;
+
+    // ── Asset handles ─────────────────────────────────────────────────
+    var meatAsset   = null;
+    var animAssets  = {};     // { Idle, Run, Attack, Die } → pc.Asset
+    var animTracks  = {};     // { Idle, Run, Attack, Die } → AnimTrack
 
     // ── Boot ──────────────────────────────────────────────────────────
     var wi = setInterval(function () {
@@ -42,24 +46,67 @@
         else app.on('start', function () { setTimeout(tryInit, 200); });
     }, 150);
 
+    // ── Init ──────────────────────────────────────────────────────────
     function init(app, cam) {
         buildHUD();
 
-        // ── Preload the meat model, then spawn enemies ─────────────────
-        meatAsset = new pc.Asset('meatEnemy', 'container', { url: '/models/enemy/meat.glb' });
+        // Track how many assets are still loading
+        var pending = 5;
+        function onAssetReady() {
+            pending--;
+            if (pending === 0) {
+                SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
+            }
+        }
+        function onAssetError(name, err) {
+            console.warn('Asset load error (' + name + '):', err);
+            pending--;
+            if (pending === 0) {
+                SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
+            }
+        }
+
+        // ── Load model ─────────────────────────────────────────────────
+        meatAsset = new pc.Asset('meatModel', 'container', { url: '/models/enemy/meat.glb' });
         app.assets.add(meatAsset);
-
-        meatAsset.on('load', function () {
-            SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
-        });
-        meatAsset.on('error', function (err) {
-            console.warn('Meat model failed to load, falling back to boxes:', err);
-            SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
-        });
-
+        meatAsset.on('load',  function () { onAssetReady(); });
+        meatAsset.on('error', function (e) { onAssetError('model', e); });
         app.assets.load(meatAsset);
 
-        // Hook gun.js shoot callback
+        // ── Load animation clips ────────────────────────────────────────
+        var animDefs = [
+            { name: 'Idle',   url: '/models/enemy/anim_idle.glb'   },
+            { name: 'Run',    url: '/models/enemy/anim_run.glb'    },
+            { name: 'Attack', url: '/models/enemy/anim_attack.glb' },
+            { name: 'Die',    url: '/models/enemy/anim_die.glb'    },
+        ];
+        animDefs.forEach(function (def) {
+            var asset = new pc.Asset('anim_' + def.name, 'container', { url: def.url });
+            app.assets.add(asset);
+            animAssets[def.name] = asset;
+
+            asset.on('load', function () {
+                // Extract AnimTrack from the container's animations array
+                try {
+                    var anims = asset.resource && asset.resource.animations;
+                    if (anims && anims.length > 0) {
+                        // In PlayCanvas v2, animations is an array of pc.Asset objects
+                        var track = anims[0].resource || anims[0];
+                        animTracks[def.name] = track;
+                        console.log('[enemies] Animation loaded: ' + def.name);
+                    } else {
+                        console.warn('[enemies] No animations in ' + def.name);
+                    }
+                } catch (e) {
+                    console.warn('[enemies] Could not extract track for ' + def.name + ':', e);
+                }
+                onAssetReady();
+            });
+            asset.on('error', function (e) { onAssetError(def.name, e); });
+            app.assets.load(asset);
+        });
+
+        // ── Bullet hit detection ────────────────────────────────────────
         window.checkEnemyHits = function (origin, dir, pellets, spread) {
             enemies.forEach(function (en) {
                 if (en.dead) return;
@@ -79,13 +126,11 @@
             });
         };
 
-        // Expose player-damage for UI
         window.addKill = function () {
             killCount++;
             if (killsEl) killsEl.textContent = 'KILLS  ' + killCount;
         };
 
-        // AI update
         app.on('update', function (dt) {
             enemies.forEach(function (en) { en.update(dt, cam.getPosition()); });
             enemies.forEach(function (en) { en.projectHPBar(app, cam); });
@@ -103,7 +148,7 @@
         return t > 0 && t < 80;
     }
 
-    // ── Collect all mesh instances from an entity tree ────────────────
+    // ── Get all mesh instances from an entity subtree ─────────────────
     function collectMeshInstances(entity) {
         var mis = [];
         entity.findComponents('render').forEach(function (rc) {
@@ -112,31 +157,78 @@
         return mis;
     }
 
-    // ── Spawn enemy ───────────────────────────────────────────────────
+    // ── Safe animation play ───────────────────────────────────────────
+    function playAnim(entity, clipName, loop) {
+        if (!entity) return;
+        var comp = entity.anim;
+        if (!comp) return;
+        try {
+            // Check if this track is assigned
+            if (animTracks[clipName]) {
+                comp.play(clipName, 0.15);    // 0.15 s blend
+            }
+        } catch (e) { /* animation system not ready yet */ }
+    }
+
+    // ── Spawn a single enemy ──────────────────────────────────────────
     function spawnEnemy(app, cam, pos, idx) {
-        // Root hitbox entity (invisible, used for position/rotation and ray tests)
+        // Invisible root entity — holds position & facing for AI
         var body = new pc.Entity('en-body-' + idx);
         body.setPosition(pos[0], pos[1], pos[2]);
         app.root.addChild(body);
 
         // ── 3-D model ──────────────────────────────────────────────────
-        var modelEntity = null;
-        var meshInstances = [];
+        var modelEntity    = null;
+        var meshInstances  = [];
+        var hasAnim        = false;
 
         if (meatAsset && meatAsset.resource) {
             try {
-                modelEntity = meatAsset.resource.instantiateRenderEntity();
+                modelEntity = meatAsset.resource.instantiateRenderEntity({
+                    castShadows: true,
+                });
                 modelEntity.setLocalScale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
                 modelEntity.setLocalPosition(0, MODEL_Y_OFFSET, 0);
                 body.addChild(modelEntity);
                 meshInstances = collectMeshInstances(modelEntity);
+
+                // ── Add anim component and assign all clips ──────────────
+                var tracksAvailable = Object.keys(animTracks).length > 0;
+                if (tracksAvailable) {
+                    // Find the skinned mesh entity to attach anim to
+                    // Add anim component to the model root entity
+                    try {
+                        modelEntity.addComponent('anim', { activate: true });
+                        var assigned = 0;
+                        ['Idle','Run','Attack','Die'].forEach(function (n) {
+                            if (animTracks[n]) {
+                                try {
+                                    modelEntity.anim.assignAnimation(n, animTracks[n]);
+                                    assigned++;
+                                } catch(ae) {
+                                    console.warn('[enemies] assignAnimation ' + n + ':', ae && (ae.message || String(ae)));
+                                }
+                            }
+                        });
+                        if (assigned > 0) {
+                            hasAnim = true;
+                            // PlayCanvas v2 AnimComponent API: use baseLayer
+                            var bl = modelEntity.anim.baseLayer;
+                            if (bl && bl.play) bl.play('Idle');
+                            console.log('[enemies] Enemy ' + idx + ' animations ready (' + assigned + ' clips)');
+                        }
+                    } catch(e) {
+                        console.warn('[enemies] anim component error on enemy ' + idx + ':',
+                            e && (e.message || e.toString() || JSON.stringify(e)), e && e.stack);
+                    }
+                }
             } catch (e) {
-                console.warn('Could not instantiate meat model:', e);
+                console.warn('[enemies] Could not instantiate model:', e);
                 modelEntity = null;
             }
         }
 
-        // Fallback: coloured box + sphere when model isn't available
+        // ── Fallback box ───────────────────────────────────────────────
         var bodyMat = null;
         if (!modelEntity) {
             body.addComponent('render', { type: 'box' });
@@ -150,12 +242,11 @@
             head.addComponent('render', { type: 'sphere' });
             head.setLocalScale(0.3, 0.3, 0.3);
             head.setLocalPosition(0, 0.78, 0);
-            var headMat = new pc.StandardMaterial();
-            headMat.diffuse = new pc.Color(0.82, 0.62, 0.48);
-            headMat.update();
-            applyMat(head, headMat);
+            var hMat = new pc.StandardMaterial();
+            hMat.diffuse = new pc.Color(0.82, 0.62, 0.48);
+            hMat.update();
+            applyMat(head, hMat);
             body.addChild(head);
-
             meshInstances = collectMeshInstances(body);
         }
 
@@ -169,43 +260,59 @@
             'width:42px;height:4px;background:rgba(0,0,0,0.55);' +
             'border:1px solid rgba(255,255,255,0.2);border-radius:2px;overflow:hidden;';
         var hpInner = document.createElement('div');
-        hpInner.style.cssText = 'height:100%;width:100%;background:#e03030;border-radius:2px;transition:width 0.1s;';
+        hpInner.style.cssText =
+            'height:100%;width:100%;background:#e03030;border-radius:2px;transition:width 0.1s;';
         hpOuter.appendChild(hpInner);
         hpBar.appendChild(hpOuter);
         document.body.appendChild(hpBar);
 
+        // ── Enemy object ───────────────────────────────────────────────
+        // animEnt is the entity that has the anim component (= modelEntity when we used addComponent)
+        var animEnt = (hasAnim && modelEntity && modelEntity.anim) ? modelEntity : null;
+
         var en = {
-            body:      body,
-            modelEnt:  modelEntity,
-            bodyMat:   bodyMat,
-            meshInstances: meshInstances,
-            hp:        ENEMY_HP,
-            dead:      false,
-            respawnT:  0,
-            state:     'PATROL',
-            stateT:    0,
-            attackT:   0,
-            hitFlash:  0,
-            basePos:   new pc.Vec3(pos[0], pos[1], pos[2]),
-            patrolDst: new pc.Vec3(pos[0], pos[1], pos[2]),
-            hpBar:     hpBar,
-            hpInner:   hpInner,
+            body:         body,
+            modelEnt:     modelEntity,
+            animEnt:      animEnt,
+            bodyMat:      bodyMat,
+            meshInstances:meshInstances,
+            hp:           ENEMY_HP,
+            dead:         false,
+            respawnT:     0,
+            state:        'PATROL',
+            prevState:    '',
+            stateT:       0,
+            attackT:      0,
+            hitFlash:     0,
+            hasAnim:      hasAnim,
+            basePos:      new pc.Vec3(pos[0], pos[1], pos[2]),
+            patrolDst:    new pc.Vec3(pos[0], pos[1], pos[2]),
+            hpBar:        hpBar,
+            hpInner:      hpInner,
         };
 
         en.bodyWorldPos = function () { return en.body.getPosition(); };
-        en.headWorldPos = function () { return en.body.getPosition().clone().add(new pc.Vec3(0, 0.78, 0)); };
+        en.headWorldPos = function () {
+            return en.body.getPosition().clone().add(new pc.Vec3(0, 0.78, 0));
+        };
 
-        // ── Flash all mesh instances white on hit ──────────────────────
+        // ── Animation helper ───────────────────────────────────────────
+        en.setAnim = function (clipName) {
+            if (!en.animEnt) return;
+            try {
+                var bl = en.animEnt.anim && en.animEnt.anim.baseLayer;
+                if (bl && bl.play) bl.play(clipName);
+            } catch(e) {}
+        };
+
+        // ── Material flash on hit ──────────────────────────────────────
         en.setFlash = function (on) {
             en.meshInstances.forEach(function (mi) {
                 if (!mi.material) return;
-                if (on) {
-                    mi.material.emissive = new pc.Color(1, 1, 1);
-                    mi.material.emissiveIntensity = 2;
-                } else {
-                    mi.material.emissive = new pc.Color(0, 0, 0);
-                    mi.material.emissiveIntensity = 1;
-                }
+                mi.material.emissive = on
+                    ? new pc.Color(1, 1, 1)
+                    : new pc.Color(0, 0, 0);
+                mi.material.emissiveIntensity = on ? 2 : 1;
                 mi.material.update();
             });
             if (en.bodyMat) {
@@ -219,25 +326,30 @@
             en.hp = Math.max(0, en.hp - dmg);
             en.hitFlash = 0.12;
             en.setFlash(true);
-            spawnDmgNum(app, en.headWorldPos(), dmg);
-            en.state = 'CHASE';
+            spawnDmgNum(en.headWorldPos(), dmg);
+            if (en.state !== 'CHASE' && en.state !== 'ATTACK') {
+                en.state = 'CHASE';
+            }
             if (en.hp <= 0) en.die();
         };
 
         en.die = function () {
             en.dead = true; en.hp = 0;
-            en.body.setEulerAngles(0, en.body.getEulerAngles().y, 90);
             en.setFlash(false);
-            // Tint model dark on death
-            en.meshInstances.forEach(function (mi) {
-                if (!mi.material) return;
-                mi.material.diffuse = new pc.Color(0.18, 0.18, 0.18);
-                mi.material.update();
-            });
-            if (en.bodyMat) {
-                en.bodyMat.diffuse = new pc.Color(0.18, 0.18, 0.18);
-                en.bodyMat.update();
-            }
+            en.setAnim('Die');
+            en.body.setEulerAngles(0, en.body.getEulerAngles().y, 0);
+            // Darken model after short delay (anim finishes)
+            setTimeout(function () {
+                en.meshInstances.forEach(function (mi) {
+                    if (!mi.material) return;
+                    mi.material.diffuse = new pc.Color(0.18, 0.18, 0.18);
+                    mi.material.update();
+                });
+                if (en.bodyMat) {
+                    en.bodyMat.diffuse = new pc.Color(0.18, 0.18, 0.18);
+                    en.bodyMat.update();
+                }
+            }, 800);
             en.hpBar.style.display = 'none';
             en.respawnT = RESPAWN_TIME;
             window.addKill && window.addKill();
@@ -248,21 +360,22 @@
             en.body.setEulerAngles(0, 0, 0);
             var ox = (Math.random() - 0.5) * 2, oz = (Math.random() - 0.5) * 2;
             en.body.setPosition(en.basePos.x + ox, en.basePos.y, en.basePos.z + oz);
-            // Restore model tint
             en.meshInstances.forEach(function (mi) {
                 if (!mi.material) return;
-                mi.material.diffuse = new pc.Color(1, 1, 1);
-                mi.material.emissive = new pc.Color(0, 0, 0);
+                mi.material.diffuse   = new pc.Color(1, 1, 1);
+                mi.material.emissive  = new pc.Color(0, 0, 0);
                 mi.material.update();
             });
             if (en.bodyMat) {
-                en.bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
+                en.bodyMat.diffuse  = new pc.Color(0.65, 0.08, 0.08);
                 en.bodyMat.emissive = new pc.Color(0, 0, 0);
                 en.bodyMat.update();
             }
             en.hpInner.style.width = '100%';
             en.hpBar.style.display = 'flex';
-            en.state = 'PATROL';
+            en.state     = 'PATROL';
+            en.prevState = '';
+            en.setAnim('Idle');
         };
 
         en.update = function (dt, playerPos) {
@@ -280,39 +393,62 @@
 
             en.hpInner.style.width = en.hp + '%';
 
-            var ep = en.body.getPosition();
-            var dx = playerPos.x - ep.x, dz = playerPos.z - ep.z;
+            var ep   = en.body.getPosition();
+            var dx   = playerPos.x - ep.x;
+            var dz   = playerPos.z - ep.z;
             var dist = Math.sqrt(dx*dx + dz*dz);
 
-            en.stateT -= dt; en.attackT -= dt;
+            en.stateT  -= dt;
+            en.attackT -= dt;
+
+            var prevState = en.state;
 
             if (en.state === 'PATROL') {
-                if (dist < DETECT_RANGE) { en.state = 'CHASE'; return; }
-                var pdx = en.patrolDst.x - ep.x, pdz = en.patrolDst.z - ep.z;
-                var pd  = Math.sqrt(pdx*pdx + pdz*pdz);
-                if (pd < 0.6 || en.stateT <= 0) {
-                    en.patrolDst.set(
-                        en.basePos.x + (Math.random() - 0.5) * 10,
-                        en.basePos.y,
-                        en.basePos.z + (Math.random() - 0.5) * 10
-                    );
-                    en.stateT = 2 + Math.random() * 3;
+                if (dist < DETECT_RANGE) {
+                    en.state = 'CHASE';
                 } else {
-                    en.body.translate(pdx/pd * PATROL_SPEED * dt, 0, pdz/pd * PATROL_SPEED * dt);
-                    en.body.setEulerAngles(0, Math.atan2(pdx, pdz) * 180/Math.PI, 0);
+                    var pdx = en.patrolDst.x - ep.x, pdz = en.patrolDst.z - ep.z;
+                    var pd  = Math.sqrt(pdx*pdx + pdz*pdz);
+                    if (pd < 0.6 || en.stateT <= 0) {
+                        en.patrolDst.set(
+                            en.basePos.x + (Math.random() - 0.5) * 10,
+                            en.basePos.y,
+                            en.basePos.z + (Math.random() - 0.5) * 10
+                        );
+                        en.stateT = 2 + Math.random() * 3;
+                    } else {
+                        en.body.translate(pdx/pd * PATROL_SPEED * dt, 0, pdz/pd * PATROL_SPEED * dt);
+                        en.body.setEulerAngles(0, Math.atan2(pdx, pdz) * 180 / Math.PI, 0);
+                    }
                 }
             } else if (en.state === 'CHASE') {
-                if (dist > DETECT_RANGE + 8) { en.state = 'PATROL'; return; }
-                if (dist < ATTACK_RANGE)     { en.state = 'ATTACK'; return; }
-                en.body.translate(dx/dist * CHASE_SPEED * dt, 0, dz/dist * CHASE_SPEED * dt);
-                en.body.setEulerAngles(0, Math.atan2(dx, dz) * 180/Math.PI, 0);
-            } else if (en.state === 'ATTACK') {
-                if (dist > ATTACK_RANGE + 0.5) { en.state = 'CHASE'; return; }
-                en.body.setEulerAngles(0, Math.atan2(dx, dz) * 180/Math.PI, 0);
-                if (en.attackT <= 0) {
-                    en.attackT = ATTACK_RATE;
-                    hitPlayer(ATTACK_DAMAGE);
+                if (dist > DETECT_RANGE + 8) {
+                    en.state = 'PATROL';
+                } else if (dist < ATTACK_RANGE) {
+                    en.state = 'ATTACK';
+                } else {
+                    en.body.translate(dx/dist * CHASE_SPEED * dt, 0, dz/dist * CHASE_SPEED * dt);
+                    en.body.setEulerAngles(0, Math.atan2(dx, dz) * 180 / Math.PI, 0);
                 }
+            } else if (en.state === 'ATTACK') {
+                if (dist > ATTACK_RANGE + 0.5) {
+                    en.state = 'CHASE';
+                } else {
+                    en.body.setEulerAngles(0, Math.atan2(dx, dz) * 180 / Math.PI, 0);
+                    if (en.attackT <= 0) {
+                        en.attackT = ATTACK_RATE;
+                        hitPlayer(ATTACK_DAMAGE);
+                    }
+                }
+            }
+
+            // Only update animation when state changes
+            if (en.state !== prevState) {
+                var clip = en.state === 'PATROL'  ? 'Idle'
+                         : en.state === 'CHASE'   ? 'Run'
+                         : en.state === 'ATTACK'  ? 'Attack'
+                         : 'Idle';
+                en.setAnim(clip);
             }
         };
 
@@ -339,8 +475,9 @@
     }
 
     // ── Floating damage number ────────────────────────────────────────
-    function spawnDmgNum(app, worldPos, dmg) {
+    function spawnDmgNum(worldPos, dmg) {
         try {
+            var app     = pc.Application.getApplication();
             var camComp = app.root.findComponents('camera')[0];
             if (!camComp) return;
             var sc = new pc.Vec4();
@@ -358,7 +495,7 @@
                 'font-family:"Segoe UI",Arial,sans-serif;transition:top 0.6s,opacity 0.6s;';
             document.body.appendChild(el);
             requestAnimationFrame(function () {
-                el.style.top  = (sy - 55) + 'px';
+                el.style.top     = (sy - 55) + 'px';
                 el.style.opacity = '0';
             });
             setTimeout(function () { el.parentNode && el.parentNode.removeChild(el); }, 700);
@@ -399,7 +536,8 @@
             'display:flex;flex-direction:column;align-items:flex-end;gap:3px;z-index:50;' + S;
 
         var lbl = document.createElement('div');
-        lbl.style.cssText = 'font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#1db31d;font-weight:700;';
+        lbl.style.cssText =
+            'font-size:9px;letter-spacing:3px;text-transform:uppercase;color:#1db31d;font-weight:700;';
         lbl.textContent = 'HEALTH';
         wrap.appendChild(lbl);
 
@@ -407,19 +545,23 @@
         row.style.cssText = 'display:flex;align-items:center;gap:8px;';
 
         var num = document.createElement('span');
-        num.style.cssText = 'font-size:38px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;line-height:1;';
+        num.style.cssText =
+            'font-size:38px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums;line-height:1;';
         num.textContent = '100';
 
         var outer = document.createElement('div');
-        outer.style.cssText = 'width:80px;height:7px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:3px;overflow:hidden;';
+        outer.style.cssText =
+            'width:80px;height:7px;background:rgba(255,255,255,0.08);' +
+            'border:1px solid rgba(255,255,255,0.15);border-radius:3px;overflow:hidden;';
         var bar = document.createElement('div');
-        bar.style.cssText = 'height:100%;width:100%;background:#1db31d;border-radius:3px;transition:width 0.15s,background 0.3s;';
+        bar.style.cssText =
+            'height:100%;width:100%;background:#1db31d;border-radius:3px;transition:width 0.15s,background 0.3s;';
         outer.appendChild(bar);
 
         row.appendChild(num); row.appendChild(outer);
         wrap.appendChild(row);
         document.body.appendChild(wrap);
-        hpEl = { bar, num };
+        hpEl = { bar: bar, num: num };
 
         killsEl = document.createElement('div');
         killsEl.style.cssText =
