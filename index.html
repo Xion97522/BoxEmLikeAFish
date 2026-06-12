@@ -20561,11 +20561,16 @@ pc.script.createLoadingScreen((app) => {
     var ATTACK_RATE    = 1.3;   // seconds between hits
     var RESPAWN_TIME   = 9;
 
+    // Visual scale of the meat model (tweak to taste)
+    var MODEL_SCALE    = 0.012;
+    var MODEL_Y_OFFSET = -0.55; // shift model down so feet touch ground
+
     var enemies    = [];
     var playerHP   = 100;
     var hpEl       = null;
     var killsEl    = null;
     var killCount  = 0;
+    var meatAsset  = null;   // preloaded container asset
 
     // ── Boot ──────────────────────────────────────────────────────────
     var wi = setInterval(function () {
@@ -20585,8 +20590,19 @@ pc.script.createLoadingScreen((app) => {
     function init(app, cam) {
         buildHUD();
 
-        // Spawn all enemies
-        SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
+        // ── Preload the meat model, then spawn enemies ─────────────────
+        meatAsset = new pc.Asset('meatEnemy', 'container', { url: '/models/enemy/meat.glb' });
+        app.assets.add(meatAsset);
+
+        meatAsset.on('load', function () {
+            SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
+        });
+        meatAsset.on('error', function (err) {
+            console.warn('Meat model failed to load, falling back to boxes:', err);
+            SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
+        });
+
+        app.assets.load(meatAsset);
 
         // Hook gun.js shoot callback
         window.checkEnemyHits = function (origin, dir, pellets, spread) {
@@ -20617,7 +20633,6 @@ pc.script.createLoadingScreen((app) => {
         // AI update
         app.on('update', function (dt) {
             enemies.forEach(function (en) { en.update(dt, cam.getPosition()); });
-            // Project health bars each frame
             enemies.forEach(function (en) { en.projectHPBar(app, cam); });
         });
     }
@@ -20633,33 +20648,63 @@ pc.script.createLoadingScreen((app) => {
         return t > 0 && t < 80;
     }
 
+    // ── Collect all mesh instances from an entity tree ────────────────
+    function collectMeshInstances(entity) {
+        var mis = [];
+        entity.findComponents('render').forEach(function (rc) {
+            if (rc.meshInstances) mis = mis.concat(rc.meshInstances);
+        });
+        return mis;
+    }
+
     // ── Spawn enemy ───────────────────────────────────────────────────
     function spawnEnemy(app, cam, pos, idx) {
-        // Body entity
+        // Root hitbox entity (invisible, used for position/rotation and ray tests)
         var body = new pc.Entity('en-body-' + idx);
-        body.addComponent('render', { type: 'box' });
-        body.setLocalScale(0.5, 1.1, 0.3);
         body.setPosition(pos[0], pos[1], pos[2]);
-
-        var bodyMat = new pc.StandardMaterial();
-        bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
-        bodyMat.update();
-        applyMat(body, bodyMat);
-
-        // Head entity
-        var head = new pc.Entity('en-head-' + idx);
-        head.addComponent('render', { type: 'sphere' });
-        head.setLocalScale(0.3, 0.3, 0.3);
-        head.setLocalPosition(0, 0.78, 0);
-        var headMat = new pc.StandardMaterial();
-        headMat.diffuse = new pc.Color(0.82, 0.62, 0.48);
-        headMat.update();
-        applyMat(head, headMat);
-        body.addChild(head);
-
         app.root.addChild(body);
 
-        // DOM health bar (screen-space projection)
+        // ── 3-D model ──────────────────────────────────────────────────
+        var modelEntity = null;
+        var meshInstances = [];
+
+        if (meatAsset && meatAsset.resource) {
+            try {
+                modelEntity = meatAsset.resource.instantiateRenderEntity();
+                modelEntity.setLocalScale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+                modelEntity.setLocalPosition(0, MODEL_Y_OFFSET, 0);
+                body.addChild(modelEntity);
+                meshInstances = collectMeshInstances(modelEntity);
+            } catch (e) {
+                console.warn('Could not instantiate meat model:', e);
+                modelEntity = null;
+            }
+        }
+
+        // Fallback: coloured box + sphere when model isn't available
+        var bodyMat = null;
+        if (!modelEntity) {
+            body.addComponent('render', { type: 'box' });
+            body.setLocalScale(0.5, 1.1, 0.3);
+            bodyMat = new pc.StandardMaterial();
+            bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
+            bodyMat.update();
+            applyMat(body, bodyMat);
+
+            var head = new pc.Entity('en-head-' + idx);
+            head.addComponent('render', { type: 'sphere' });
+            head.setLocalScale(0.3, 0.3, 0.3);
+            head.setLocalPosition(0, 0.78, 0);
+            var headMat = new pc.StandardMaterial();
+            headMat.diffuse = new pc.Color(0.82, 0.62, 0.48);
+            headMat.update();
+            applyMat(head, headMat);
+            body.addChild(head);
+
+            meshInstances = collectMeshInstances(body);
+        }
+
+        // ── DOM health bar ─────────────────────────────────────────────
         var hpBar = document.createElement('div');
         hpBar.style.cssText =
             'position:fixed;pointer-events:none;z-index:45;' +
@@ -20675,31 +20720,50 @@ pc.script.createLoadingScreen((app) => {
         document.body.appendChild(hpBar);
 
         var en = {
-            body:     body,
-            bodyMat:  bodyMat,
-            headMat:  headMat,
-            hp:       ENEMY_HP,
-            dead:     false,
-            respawnT: 0,
-            state:    'PATROL',
-            stateT:   0,
-            attackT:  0,
-            hitFlash: 0,
-            basePos:  new pc.Vec3(pos[0], pos[1], pos[2]),
+            body:      body,
+            modelEnt:  modelEntity,
+            bodyMat:   bodyMat,
+            meshInstances: meshInstances,
+            hp:        ENEMY_HP,
+            dead:      false,
+            respawnT:  0,
+            state:     'PATROL',
+            stateT:    0,
+            attackT:   0,
+            hitFlash:  0,
+            basePos:   new pc.Vec3(pos[0], pos[1], pos[2]),
             patrolDst: new pc.Vec3(pos[0], pos[1], pos[2]),
-            hpBar:    hpBar,
-            hpInner:  hpInner,
+            hpBar:     hpBar,
+            hpInner:   hpInner,
         };
 
         en.bodyWorldPos = function () { return en.body.getPosition(); };
         en.headWorldPos = function () { return en.body.getPosition().clone().add(new pc.Vec3(0, 0.78, 0)); };
 
+        // ── Flash all mesh instances white on hit ──────────────────────
+        en.setFlash = function (on) {
+            en.meshInstances.forEach(function (mi) {
+                if (!mi.material) return;
+                if (on) {
+                    mi.material.emissive = new pc.Color(1, 1, 1);
+                    mi.material.emissiveIntensity = 2;
+                } else {
+                    mi.material.emissive = new pc.Color(0, 0, 0);
+                    mi.material.emissiveIntensity = 1;
+                }
+                mi.material.update();
+            });
+            if (en.bodyMat) {
+                en.bodyMat.emissive = on ? new pc.Color(1,1,1) : new pc.Color(0,0,0);
+                en.bodyMat.update();
+            }
+        };
+
         en.onHit = function (dmg) {
             if (en.dead) return;
             en.hp = Math.max(0, en.hp - dmg);
             en.hitFlash = 0.12;
-            bodyMat.emissive = new pc.Color(1, 1, 1);
-            bodyMat.update();
+            en.setFlash(true);
             spawnDmgNum(app, en.headWorldPos(), dmg);
             en.state = 'CHASE';
             if (en.hp <= 0) en.die();
@@ -20708,9 +20772,17 @@ pc.script.createLoadingScreen((app) => {
         en.die = function () {
             en.dead = true; en.hp = 0;
             en.body.setEulerAngles(0, en.body.getEulerAngles().y, 90);
-            bodyMat.diffuse = new pc.Color(0.18, 0.18, 0.18);
-            bodyMat.emissive = new pc.Color(0, 0, 0);
-            bodyMat.update();
+            en.setFlash(false);
+            // Tint model dark on death
+            en.meshInstances.forEach(function (mi) {
+                if (!mi.material) return;
+                mi.material.diffuse = new pc.Color(0.18, 0.18, 0.18);
+                mi.material.update();
+            });
+            if (en.bodyMat) {
+                en.bodyMat.diffuse = new pc.Color(0.18, 0.18, 0.18);
+                en.bodyMat.update();
+            }
             en.hpBar.style.display = 'none';
             en.respawnT = RESPAWN_TIME;
             window.addKill && window.addKill();
@@ -20721,9 +20793,18 @@ pc.script.createLoadingScreen((app) => {
             en.body.setEulerAngles(0, 0, 0);
             var ox = (Math.random() - 0.5) * 2, oz = (Math.random() - 0.5) * 2;
             en.body.setPosition(en.basePos.x + ox, en.basePos.y, en.basePos.z + oz);
-            bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
-            bodyMat.emissive = new pc.Color(0, 0, 0);
-            bodyMat.update();
+            // Restore model tint
+            en.meshInstances.forEach(function (mi) {
+                if (!mi.material) return;
+                mi.material.diffuse = new pc.Color(1, 1, 1);
+                mi.material.emissive = new pc.Color(0, 0, 0);
+                mi.material.update();
+            });
+            if (en.bodyMat) {
+                en.bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
+                en.bodyMat.emissive = new pc.Color(0, 0, 0);
+                en.bodyMat.update();
+            }
             en.hpInner.style.width = '100%';
             en.hpBar.style.display = 'flex';
             en.state = 'PATROL';
@@ -20739,10 +20820,7 @@ pc.script.createLoadingScreen((app) => {
             // Hit flash decay
             if (en.hitFlash > 0) {
                 en.hitFlash -= dt;
-                if (en.hitFlash <= 0) {
-                    bodyMat.emissive = new pc.Color(0, 0, 0);
-                    bodyMat.update();
-                }
+                if (en.hitFlash <= 0) en.setFlash(false);
             }
 
             en.hpInner.style.width = en.hp + '%';
@@ -20792,7 +20870,6 @@ pc.script.createLoadingScreen((app) => {
                 headPos.y += 0.22;
                 var sc = new pc.Vec4();
                 camComp.worldToScreen(headPos, sc);
-                // sc.z < 0 means behind camera
                 if (sc.z < 0 || sc.z > 1) { en.hpBar.style.display = 'none'; return; }
                 var vw = window.innerWidth, vh = window.innerHeight;
                 var sx = sc.x / app.graphicsDevice.width  * vw;
@@ -20842,7 +20919,6 @@ pc.script.createLoadingScreen((app) => {
             hpEl.bar.style.background = c;
             hpEl.num.textContent = playerHP;
         }
-        // Red vignette flash
         var ov = document.createElement('div');
         ov.style.cssText =
             'position:fixed;inset:0;pointer-events:none;z-index:98;' +
@@ -20863,7 +20939,6 @@ pc.script.createLoadingScreen((app) => {
     function buildHUD() {
         var S = 'font-family:"Segoe UI",Arial,sans-serif;pointer-events:none;';
 
-        // Player HP — bottom-right
         var wrap = document.createElement('div');
         wrap.style.cssText = 'position:fixed;bottom:22px;right:22px;' +
             'display:flex;flex-direction:column;align-items:flex-end;gap:3px;z-index:50;' + S;
@@ -20891,7 +20966,6 @@ pc.script.createLoadingScreen((app) => {
         document.body.appendChild(wrap);
         hpEl = { bar, num };
 
-        // Kill counter — top-right
         killsEl = document.createElement('div');
         killsEl.style.cssText =
             'position:fixed;top:20px;right:22px;font-size:11px;' +

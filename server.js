@@ -14,6 +14,9 @@ const MIME = {
     '.wasm': 'application/wasm',
     '.woff': 'font/woff',
     '.woff2': 'font/woff2',
+    '.glb':  'model/gltf-binary',
+    '.gltf': 'model/gltf+json',
+    '.fbx':  'application/octet-stream',
 };
 
 const server = http.createServer((req, res) => {
