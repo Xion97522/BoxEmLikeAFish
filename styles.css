@@ -81,6 +81,7 @@ canvas:focus {
 }
 
 .xl-btn.a  { background: #107C10; border-color: #1db31d; border-radius: 50%; width: 20px; min-width: 20px; }
+.xl-btn.x  { background: #1e6fa3; border-color: #3a9fd4; border-radius: 50%; width: 20px; min-width: 20px; }
 .xl-btn.rt { background: rgba(255,100,0,0.5); border-color: rgba(255,140,0,0.7); }
 .xl-btn.ls,
 .xl-btn.rs { background: rgba(100,150,255,0.25); border-color: rgba(120,160,255,0.5); }

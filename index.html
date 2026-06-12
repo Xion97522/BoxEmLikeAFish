@@ -28,8 +28,8 @@
         <div class="xl-row"><span class="xl-btn ls">LS</span><span>Move</span></div>
         <div class="xl-row"><span class="xl-btn rs">RS</span><span>Look</span></div>
         <div class="xl-row"><span class="xl-btn rt">RT</span><span>Shoot</span></div>
-        <div class="xl-row"><span class="xl-btn a">A</span><span>Jump</span></div>
-        <div class="xl-row"><span class="xl-btn lb">LB</span><span>Sprint</span></div>
+        <div class="xl-row"><span class="xl-btn x">X</span><span>Jump</span></div>
+        <div class="xl-row"><span class="xl-btn a">A</span><span>Sprint</span></div>
     </div>
 
     <script>
@@ -40,6 +40,71 @@
         hint.classList.add('show');
         setTimeout(function() { hint.classList.remove('show'); }, 3000);
     });
+
+    // ── Xbox button remap: A = Sprint, X = Jump ──────────────────────
+    // The built-in gamePadInput script fires cc:jump on buttons[0] (A).
+    // We swap A (0) and X (2) in getGamepads() so that existing code
+    // sees X where it expects A → X now triggers jump.
+    // We then poll the *real* A button separately to fire cc:sprint.
+
+    (function() {
+        var _orig = navigator.getGamepads.bind(navigator);
+
+        // Swap A (index 0) and X (index 2) so built-in jump fires on X
+        navigator.getGamepads = function() {
+            var pads = _orig();
+            return Array.from(pads).map(function(pad) {
+                if (!pad) return null;
+                var btns = Array.from(pad.buttons).map(function(b) {
+                    return { pressed: b.pressed, value: b.value, touched: b.touched };
+                });
+                // Swap A ↔ X
+                var tmp = btns[0];
+                btns[0] = btns[2];
+                btns[2] = tmp;
+                return {
+                    axes:      pad.axes,
+                    buttons:   btns,
+                    connected: pad.connected,
+                    id:        pad.id,
+                    index:     pad.index,
+                    mapping:   pad.mapping,
+                    timestamp: pad.timestamp,
+                };
+            });
+        };
+
+        // Poll real A button (original index 0) to fire cc:sprint
+        var lastSprint = false;
+
+        function pollSprint() {
+            // Wait until PlayCanvas app is ready
+            if (!window.pc || !pc.Application || !pc.Application.getApplication()) {
+                setTimeout(pollSprint, 200);
+                return;
+            }
+            var app = pc.Application.getApplication();
+
+            setInterval(function() {
+                var pads = _orig();
+                var sprint = false;
+                for (var i = 0; i < pads.length; i++) {
+                    var pad = pads[i];
+                    if (pad && pad.connected) {
+                        // Real A button is index 0 in original gamepad
+                        sprint = !!(pad.buttons[0] && pad.buttons[0].pressed);
+                        break;
+                    }
+                }
+                if (sprint !== lastSprint) {
+                    app.fire('cc:sprint', sprint);
+                    lastSprint = sprint;
+                }
+            }, 16);
+        }
+
+        pollSprint();
+    })();
     </script>
 </body>
 </html>
