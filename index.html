@@ -1,18 +1,207 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta name='viewport' content='width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover' />
-    <meta charset='utf-8'>
-    <link rel="stylesheet" type="text/css" href="styles.css">
-    <link rel="manifest" href="manifest.json">
-    <style></style>
-    <title>Base FPS by Cal Schmidt</title>
-    <script src="playcanvas-stable.min.js"></script>
-    <script src="__settings__.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZONE BREACH</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
 </head>
 <body>
-    <script src="__modules__.js"></script>
-    <script src="__start__.js"></script>
-    <script src="__loading__.js"></script>
+
+<!-- ═══ START SCREEN ═══ -->
+<div id="start-screen">
+    <div class="start-bg"></div>
+    <div class="start-content">
+        <div class="xbox-logo">
+            <svg viewBox="0 0 80 80" width="80" height="80"><circle cx="40" cy="40" r="38" fill="#107C10" stroke="#1a9a1a" stroke-width="2"/>
+            <path d="M40 14 C28 14 16 24 12 36 C9 45 12 56 20 63 C23 52 30 42 40 36 C50 42 57 52 60 63 C68 56 71 45 68 36 C64 24 52 14 40 14Z" fill="white" opacity="0.9"/>
+            <ellipse cx="40" cy="50" rx="14" ry="10" fill="white" opacity="0.85"/></svg>
+        </div>
+        <h1 class="game-title">ZONE BREACH</h1>
+        <p class="game-subtitle">TACTICAL FIRST-PERSON SHOOTER</p>
+        <div class="menu-items">
+            <div class="menu-item selected" id="btn-start" onclick="startGame()">
+                <span class="btn-a">A</span> START GAME
+            </div>
+            <div class="menu-item" id="btn-controls" onclick="showControls()">
+                <span class="btn-y">Y</span> CONTROLS
+            </div>
+        </div>
+        <div class="version-tag">PRESS A OR CLICK START GAME</div>
+    </div>
+</div>
+
+<!-- ═══ CONTROLS SCREEN ═══ -->
+<div id="controls-screen" class="hidden">
+    <div class="overlay-panel">
+        <h2 class="panel-title">CONTROLS</h2>
+        <div class="controls-grid">
+            <div class="ctrl-col">
+                <h3>⌨️ KEYBOARD & MOUSE</h3>
+                <div class="ctrl-row"><span class="key">W A S D</span><span>Move</span></div>
+                <div class="ctrl-row"><span class="key">MOUSE</span><span>Look</span></div>
+                <div class="ctrl-row"><span class="key">LMB</span><span>Shoot</span></div>
+                <div class="ctrl-row"><span class="key">R</span><span>Reload</span></div>
+                <div class="ctrl-row"><span class="key">SHIFT</span><span>Sprint</span></div>
+                <div class="ctrl-row"><span class="key">SPACE</span><span>Jump</span></div>
+                <div class="ctrl-row"><span class="key">1 2 3</span><span>Switch Weapon</span></div>
+                <div class="ctrl-row"><span class="key">ESC</span><span>Pause</span></div>
+            </div>
+            <div class="ctrl-col">
+                <h3>🎮 XBOX CONTROLLER</h3>
+                <div class="ctrl-row"><span class="key xbox-btn">L‑STICK</span><span>Move</span></div>
+                <div class="ctrl-row"><span class="key xbox-btn">R‑STICK</span><span>Look</span></div>
+                <div class="ctrl-row"><span class="key xbox-btn">RT</span><span>Shoot</span></div>
+                <div class="ctrl-row"><span class="key xbox-btn">RB</span><span>Reload</span></div>
+                <div class="ctrl-row"><span class="key xbox-btn">LT</span><span>Sprint</span></div>
+                <div class="ctrl-row"><span class="key xbox-btn">A</span><span>Jump</span></div>
+                <div class="ctrl-row"><span class="key xbox-btn">LB / Y</span><span>Switch Weapon</span></div>
+                <div class="ctrl-row"><span class="key xbox-btn">START</span><span>Pause</span></div>
+            </div>
+        </div>
+        <button class="xbox-button green" onclick="hideControls()"><span class="btn-b">B</span> BACK</button>
+    </div>
+</div>
+
+<!-- ═══ HUD ═══ -->
+<div id="hud" class="hidden">
+    <!-- Top Bar -->
+    <div class="hud-top">
+        <div class="hud-wave">
+            <span class="hud-label">WAVE</span>
+            <span id="wave-num" class="hud-value">01</span>
+        </div>
+        <div class="hud-score-block">
+            <span class="hud-label">SCORE</span>
+            <span id="score-val" class="hud-value">000000</span>
+        </div>
+        <div class="hud-kills">
+            <span class="hud-label">KILLS</span>
+            <span id="kill-val" class="hud-value">00</span>
+        </div>
+    </div>
+
+    <!-- Crosshair -->
+    <div id="crosshair">
+        <div class="ch-top"></div>
+        <div class="ch-bottom"></div>
+        <div class="ch-left"></div>
+        <div class="ch-right"></div>
+        <div class="ch-dot"></div>
+    </div>
+
+    <!-- Hitmarker -->
+    <div id="hitmarker" class="hidden">✕</div>
+
+    <!-- Bottom bar -->
+    <div class="hud-bottom">
+        <!-- Health -->
+        <div class="hud-health-block">
+            <div class="hud-label">HEALTH</div>
+            <div class="health-bar-outer">
+                <div id="health-bar" class="health-bar-inner"></div>
+            </div>
+            <span id="health-val" class="health-num">100</span>
+        </div>
+
+        <!-- Weapon + Ammo -->
+        <div class="hud-weapon-block">
+            <div id="weapon-name" class="weapon-name">PISTOL</div>
+            <div class="ammo-display">
+                <span id="ammo-mag" class="ammo-mag">12</span>
+                <span class="ammo-sep">/</span>
+                <span id="ammo-res" class="ammo-res">∞</span>
+            </div>
+            <div id="reload-bar-wrap" class="hidden">
+                <div class="hud-label">RELOADING</div>
+                <div class="reload-bar-outer"><div id="reload-bar" class="reload-bar-inner"></div></div>
+            </div>
+        </div>
+
+        <!-- Weapon slots -->
+        <div class="weapon-slots">
+            <div class="w-slot" id="ws-0"><span class="slot-key">1</span>PISTOL</div>
+            <div class="w-slot" id="ws-1"><span class="slot-key">2</span>A.RIFLE</div>
+            <div class="w-slot" id="ws-2"><span class="slot-key">3</span>SHOTGUN</div>
+        </div>
+    </div>
+
+    <!-- Enemy count -->
+    <div class="hud-enemies">
+        <span class="hud-label">ENEMIES</span>
+        <span id="enemy-count" class="hud-value enemy-red">00</span>
+    </div>
+
+    <!-- Damage flash overlay -->
+    <div id="damage-flash"></div>
+
+    <!-- Hit direction indicators -->
+    <div id="hit-n" class="hit-dir hit-n hidden"></div>
+    <div id="hit-s" class="hit-dir hit-s hidden"></div>
+    <div id="hit-e" class="hit-dir hit-e hidden"></div>
+    <div id="hit-w" class="hit-dir hit-w hidden"></div>
+</div>
+
+<!-- ═══ WAVE CLEAR BANNER ═══ -->
+<div id="wave-clear" class="hidden">
+    <div class="wave-clear-inner">
+        <div class="wave-clear-label">WAVE COMPLETE</div>
+        <div id="wave-clear-num" class="wave-clear-num">01</div>
+        <div id="wave-bonus" class="wave-bonus-pts"></div>
+        <div class="wave-clear-next">Next wave starting…</div>
+    </div>
+</div>
+
+<!-- ═══ PAUSE SCREEN ═══ -->
+<div id="pause-screen" class="hidden">
+    <div class="overlay-panel pause-panel">
+        <h2 class="panel-title">PAUSED</h2>
+        <div class="menu-items">
+            <div class="menu-item selected" onclick="resumeGame()">
+                <span class="btn-a">A</span> RESUME
+            </div>
+            <div class="menu-item" onclick="returnToMenu()">
+                <span class="btn-b">B</span> MAIN MENU
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ GAME OVER SCREEN ═══ -->
+<div id="gameover-screen" class="hidden">
+    <div class="overlay-panel go-panel">
+        <div class="go-title">YOU DIED</div>
+        <div class="go-stats">
+            <div class="go-stat"><span class="go-label">SCORE</span><span id="go-score" class="go-val">0</span></div>
+            <div class="go-stat"><span class="go-label">WAVE REACHED</span><span id="go-wave" class="go-val">1</span></div>
+            <div class="go-stat"><span class="go-label">TOTAL KILLS</span><span id="go-kills" class="go-val">0</span></div>
+        </div>
+        <div class="menu-items" style="margin-top:30px">
+            <div class="menu-item selected" onclick="startGame()">
+                <span class="btn-a">A</span> PLAY AGAIN
+            </div>
+            <div class="menu-item" onclick="returnToMenu()">
+                <span class="btn-b">B</span> MAIN MENU
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ═══ LOCK PROMPT ═══ -->
+<div id="lock-prompt" class="hidden">
+    <div class="lock-prompt-inner">
+        <div>🖱️ Click to capture mouse &amp; play</div>
+        <div style="font-size:13px;opacity:0.7;margin-top:6px">Press ESC to pause / release mouse</div>
+    </div>
+</div>
+
+<!-- ═══ NOTIFICATION ═══ -->
+<div id="notif" class="hidden"></div>
+
+<canvas id="canvas"></canvas>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="game.js"></script>
 </body>
 </html>
