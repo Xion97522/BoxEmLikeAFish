@@ -26,7 +26,7 @@
     var chSpread = 0;
 
     // Gamepad prev state
-    var prevRT = false, prevRB = false, prevLB = false;
+    var prevRT = false, prevRB = false;
 
     // Keep reference to original getGamepads (before the A/X swap override)
     var _rawPads = navigator.getGamepads.bind(navigator);
@@ -173,6 +173,7 @@
 
         // ── Shoot ─────────────────────────────────────────────────────
         function shoot() {
+            if (window.wheelOpen) return;
             var wd = WEAPONS[currentWeapon];
             var am = ammo[currentWeapon];
 
@@ -224,6 +225,11 @@
             }
 
             if (hitAny) showHitmarker();
+
+            // Notify enemy system
+            if (window.checkEnemyHits) {
+                window.checkEnemyHits(camPos, {x: fwd.x, y: fwd.y, z: fwd.z}, wd.pellets, wd.spread);
+            }
 
             if (am.mag === 0 && am.res > 0) setTimeout(startReload, 80);
             updateHUD();
@@ -367,15 +373,15 @@
 
                 var rt = pad.buttons[7] && pad.buttons[7].value > 0.5;
                 var rb = pad.buttons[5] && pad.buttons[5].pressed;
-                var lb = pad.buttons[4] && pad.buttons[4].pressed;
 
-                if (rt && fireCooldown <= 0 && !reloading) {
-                    if (WEAPONS[currentWeapon].auto || !prevRT) shoot();
+                if (!window.wheelOpen) {
+                    if (rt && fireCooldown <= 0 && !reloading) {
+                        if (WEAPONS[currentWeapon].auto || !prevRT) shoot();
+                    }
+                    if (rb && !prevRB) startReload();
                 }
-                if (rb && !prevRB) startReload();
-                if (lb && !prevLB) switchWeapon((currentWeapon + 1) % WEAPONS.length);
 
-                prevRT = rt; prevRB = rb; prevLB = lb;
+                prevRT = rt; prevRB = rb;
                 break;
             }
 
@@ -395,6 +401,18 @@
         });
 
         updateHUD();
+
+        // Expose globals for weapon wheel + enemy system
+        window.gunSwitchWeapon  = function (idx) { switchWeapon(idx); };
+        window.gunAmmoState     = ammo;
+        window.gunCurrentWeapon = currentWeapon;
+
+        // Keep gunCurrentWeapon in sync
+        var _origSwitch = switchWeapon;
+        switchWeapon = function (idx) {
+            _origSwitch(idx);
+            window.gunCurrentWeapon = idx;
+        };
 
         // ── HUD helpers ───────────────────────────────────────────────
         function updateHUD() {
