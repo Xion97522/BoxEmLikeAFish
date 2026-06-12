@@ -41,5 +41,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-    console.log(`ZONE BREACH running on port ${PORT}`);
+    console.log(`BOX EM LIKE A FISH running on port ${PORT}`);
 });

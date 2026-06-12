@@ -1,4 +1,4 @@
-// menu.js — Main menu for Zone Breach
+// menu.js — Main menu for Box Em Like a Fish
 (function () {
     'use strict';
 
@@ -64,21 +64,21 @@
             class: 'zb-fadein zb-d03',
             style: 'font-size:10px;letter-spacing:10px;text-transform:uppercase;' +
                    'color:#1db31d;font-weight:700;margin-bottom:18px;opacity:0;',
-            text: 'TACTICAL  BATTLE  ROYALE',
+            text: 'THE  ULTIMATE  FISH  BOXING  GAME',
         }));
 
         // Main title
         var titleWrap = el('div', { class: 'zb-fadein', style: 'text-align:center;opacity:0;' });
         titleWrap.innerHTML =
-            '<div style="font-size:clamp(64px,10vw,108px);font-weight:900;letter-spacing:-2px;' +
+            '<div style="font-size:clamp(48px,7.5vw,88px);font-weight:900;letter-spacing:-1px;' +
             'line-height:0.88;color:#fff;' +
             'text-shadow:0 0 60px rgba(29,179,29,0.25),0 0 120px rgba(29,179,29,0.1);">' +
-            'ZONE</div>' +
-            '<div class="zb-glitch" data-text="BREACH" ' +
-            'style="font-size:clamp(72px,11.5vw,124px);font-weight:900;letter-spacing:-2px;' +
+            'BOX EM</div>' +
+            '<div class="zb-glitch" data-text="LIKE A FISH" ' +
+            'style="font-size:clamp(52px,8.5vw,96px);font-weight:900;letter-spacing:-1px;' +
             'line-height:0.88;color:#1db31d;' +
             'text-shadow:0 0 40px rgba(29,179,29,0.5),0 0 80px rgba(29,179,29,0.2);">' +
-            'BREACH</div>';
+            'LIKE A FISH</div>';
         content.appendChild(titleWrap);
 
         // Divider
@@ -133,7 +133,7 @@
         menuEl.appendChild(el('div', {
             style: 'position:absolute;bottom:20px;right:24px;z-index:10;' +
                    'font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.18);',
-            text: 'ZONE BREACH  v1.0',
+            text: 'BOX EM LIKE A FISH  v1.0',
         }));
 
         // Corner brackets

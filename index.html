@@ -20543,7 +20543,7 @@ pc.script.createLoadingScreen((app) => {
 
     </script>
     <script>
-// enemies.js — Enemy AI system for PlayCanvas FPS  (with skeletal animations)
+// enemies.js — Enemy AI system for Box Em Like a Fish
 (function () {
     'use strict';
 
@@ -20562,22 +20562,11 @@ pc.script.createLoadingScreen((app) => {
     var ATTACK_RATE   = 1.3;   // seconds between hits
     var RESPAWN_TIME  = 9;
 
-    // GLB is already in metres (Three.js FBXLoader applies the cm→m conversion).
-    // Scale = 1.0 gives a ~1.8 m tall character.
-    // Y offset moves the visual mesh so feet sit on the ground (origin is at hips).
-    var MODEL_SCALE    = 1.0;
-    var MODEL_Y_OFFSET = -0.95;   // shift hips-origin down so feet land on y=0
-
     var enemies   = [];
     var playerHP  = 100;
     var hpEl      = null;
     var killsEl   = null;
     var killCount = 0;
-
-    // ── Asset handles ─────────────────────────────────────────────────
-    var meatAsset   = null;
-    var animAssets  = {};     // { Idle, Run, Attack, Die } → pc.Asset
-    var animTracks  = {};     // { Idle, Run, Attack, Die } → AnimTrack
 
     // ── Boot ──────────────────────────────────────────────────────────
     var wi = setInterval(function () {
@@ -20598,61 +20587,7 @@ pc.script.createLoadingScreen((app) => {
     function init(app, cam) {
         buildHUD();
 
-        // Track how many assets are still loading
-        var pending = 5;
-        function onAssetReady() {
-            pending--;
-            if (pending === 0) {
-                SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
-            }
-        }
-        function onAssetError(name, err) {
-            console.warn('Asset load error (' + name + '):', err);
-            pending--;
-            if (pending === 0) {
-                SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
-            }
-        }
-
-        // ── Load model ─────────────────────────────────────────────────
-        meatAsset = new pc.Asset('meatModel', 'container', { url: '/models/enemy/meat.glb' });
-        app.assets.add(meatAsset);
-        meatAsset.on('load',  function () { onAssetReady(); });
-        meatAsset.on('error', function (e) { onAssetError('model', e); });
-        app.assets.load(meatAsset);
-
-        // ── Load animation clips ────────────────────────────────────────
-        var animDefs = [
-            { name: 'Idle',   url: '/models/enemy/anim_idle.glb'   },
-            { name: 'Run',    url: '/models/enemy/anim_run.glb'    },
-            { name: 'Attack', url: '/models/enemy/anim_attack.glb' },
-            { name: 'Die',    url: '/models/enemy/anim_die.glb'    },
-        ];
-        animDefs.forEach(function (def) {
-            var asset = new pc.Asset('anim_' + def.name, 'container', { url: def.url });
-            app.assets.add(asset);
-            animAssets[def.name] = asset;
-
-            asset.on('load', function () {
-                // Extract AnimTrack from the container's animations array
-                try {
-                    var anims = asset.resource && asset.resource.animations;
-                    if (anims && anims.length > 0) {
-                        // In PlayCanvas v2, animations is an array of pc.Asset objects
-                        var track = anims[0].resource || anims[0];
-                        animTracks[def.name] = track;
-                        console.log('[enemies] Animation loaded: ' + def.name);
-                    } else {
-                        console.warn('[enemies] No animations in ' + def.name);
-                    }
-                } catch (e) {
-                    console.warn('[enemies] Could not extract track for ' + def.name + ':', e);
-                }
-                onAssetReady();
-            });
-            asset.on('error', function (e) { onAssetError(def.name, e); });
-            app.assets.load(asset);
-        });
+        SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
 
         // ── Bullet hit detection ────────────────────────────────────────
         window.checkEnemyHits = function (origin, dir, pellets, spread) {
@@ -20725,78 +20660,26 @@ pc.script.createLoadingScreen((app) => {
         body.setPosition(pos[0], pos[1], pos[2]);
         app.root.addChild(body);
 
-        // ── 3-D model ──────────────────────────────────────────────────
-        var modelEntity    = null;
-        var meshInstances  = [];
-        var hasAnim        = false;
+        // ── Box enemy ─────────────────────────────────────────────────
+        var meshInstances = [];
 
-        if (meatAsset && meatAsset.resource) {
-            try {
-                modelEntity = meatAsset.resource.instantiateRenderEntity({
-                    castShadows: true,
-                });
-                modelEntity.setLocalScale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
-                modelEntity.setLocalPosition(0, MODEL_Y_OFFSET, 0);
-                body.addChild(modelEntity);
-                meshInstances = collectMeshInstances(modelEntity);
+        body.addComponent('render', { type: 'box' });
+        body.setLocalScale(0.5, 1.1, 0.3);
+        var bodyMat = new pc.StandardMaterial();
+        bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
+        bodyMat.update();
+        applyMat(body, bodyMat);
 
-                // ── Add anim component and assign all clips ──────────────
-                var tracksAvailable = Object.keys(animTracks).length > 0;
-                if (tracksAvailable) {
-                    // Find the skinned mesh entity to attach anim to
-                    // Add anim component to the model root entity
-                    try {
-                        modelEntity.addComponent('anim', { activate: true });
-                        var assigned = 0;
-                        ['Idle','Run','Attack','Die'].forEach(function (n) {
-                            if (animTracks[n]) {
-                                try {
-                                    modelEntity.anim.assignAnimation(n, animTracks[n]);
-                                    assigned++;
-                                } catch(ae) {
-                                    console.warn('[enemies] assignAnimation ' + n + ':', ae && (ae.message || String(ae)));
-                                }
-                            }
-                        });
-                        if (assigned > 0) {
-                            hasAnim = true;
-                            // PlayCanvas v2 AnimComponent API: use baseLayer
-                            var bl = modelEntity.anim.baseLayer;
-                            if (bl && bl.play) bl.play('Idle');
-                            console.log('[enemies] Enemy ' + idx + ' animations ready (' + assigned + ' clips)');
-                        }
-                    } catch(e) {
-                        console.warn('[enemies] anim component error on enemy ' + idx + ':',
-                            e && (e.message || e.toString() || JSON.stringify(e)), e && e.stack);
-                    }
-                }
-            } catch (e) {
-                console.warn('[enemies] Could not instantiate model:', e);
-                modelEntity = null;
-            }
-        }
-
-        // ── Fallback box ───────────────────────────────────────────────
-        var bodyMat = null;
-        if (!modelEntity) {
-            body.addComponent('render', { type: 'box' });
-            body.setLocalScale(0.5, 1.1, 0.3);
-            bodyMat = new pc.StandardMaterial();
-            bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
-            bodyMat.update();
-            applyMat(body, bodyMat);
-
-            var head = new pc.Entity('en-head-' + idx);
-            head.addComponent('render', { type: 'sphere' });
-            head.setLocalScale(0.3, 0.3, 0.3);
-            head.setLocalPosition(0, 0.78, 0);
-            var hMat = new pc.StandardMaterial();
-            hMat.diffuse = new pc.Color(0.82, 0.62, 0.48);
-            hMat.update();
-            applyMat(head, hMat);
-            body.addChild(head);
-            meshInstances = collectMeshInstances(body);
-        }
+        var head = new pc.Entity('en-head-' + idx);
+        head.addComponent('render', { type: 'sphere' });
+        head.setLocalScale(0.3, 0.3, 0.3);
+        head.setLocalPosition(0, 0.78, 0);
+        var hMat = new pc.StandardMaterial();
+        hMat.diffuse = new pc.Color(0.82, 0.62, 0.48);
+        hMat.update();
+        applyMat(head, hMat);
+        body.addChild(head);
+        meshInstances = collectMeshInstances(body);
 
         // ── DOM health bar ─────────────────────────────────────────────
         var hpBar = document.createElement('div');
@@ -21125,6 +21008,7 @@ pc.script.createLoadingScreen((app) => {
     }
 
 })();
+
 
     </script>
     <script>
