@@ -191,6 +191,7 @@
                     castShadows: true,
                 });
                 modelEntity.setLocalScale(MODEL_SCALE, MODEL_SCALE, MODEL_SCALE);
+                modelEntity.setLocalEulerAngles(90, 0, 0);
                 modelEntity.setLocalPosition(0, MODEL_Y_OFFSET, 0);
                 body.addChild(modelEntity);
                 meshInstances = collectMeshInstances(modelEntity);
