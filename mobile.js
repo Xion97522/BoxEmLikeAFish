@@ -66,19 +66,26 @@
             canvas.addEventListener('touchend',    function (e) { e.preventDefault(); }, { passive: false });
         }
 
+        // ── Single wrapper — hidden when a controller is connected ──────
+        var overlay = document.createElement('div');
+        overlay.id  = 'mb-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:199;pointer-events:none;' +
+                                 'transition:opacity 0.35s;';
+        document.body.appendChild(overlay);
+
         // ── Left joystick (move) ─────────────────────────────────────
         var lBase  = mkCircle('lj-base');
         var lKnob  = mkKnob('lj-knob');
         lBase.appendChild(lKnob);
         lBase.style.cssText += 'left:36px;bottom:80px;';
-        document.body.appendChild(lBase);
+        overlay.appendChild(lBase);
 
         // ── Right joystick (look) ────────────────────────────────────
         var rBase  = mkCircle('rj-base');
         var rKnob  = mkKnob('rj-knob');
         rBase.appendChild(rKnob);
         rBase.style.cssText += 'right:180px;bottom:80px;';
-        document.body.appendChild(rBase);
+        overlay.appendChild(rBase);
 
         // ── Action buttons (right cluster) ───────────────────────────
         var btnFire   = mkBtn('FIRE',   '255,70,70',   'right:36px;bottom:80px;');
@@ -86,14 +93,57 @@
         var btnBuild  = mkBtn('BUILD',  '100,180,255', 'right:104px;bottom:116px;');
         var btnReload = mkBtn('RELOAD', '255,200,60',  'right:36px;bottom:220px;');
 
-        document.body.appendChild(btnFire);
-        document.body.appendChild(btnJump);
-        document.body.appendChild(btnBuild);
-        document.body.appendChild(btnReload);
+        overlay.appendChild(btnFire);
+        overlay.appendChild(btnJump);
+        overlay.appendChild(btnBuild);
+        overlay.appendChild(btnReload);
 
         // Labels
-        mkLabel('MOVE',  'left:36px;bottom:198px;');
-        mkLabel('LOOK',  'right:210px;bottom:198px;');
+        mkLabel('MOVE', 'left:36px;bottom:198px;',  overlay);
+        mkLabel('LOOK', 'right:210px;bottom:198px;', overlay);
+
+        // ── Show / hide based on gamepad connection ───────────────────
+        function anyPadConnected() {
+            var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+            for (var i = 0; i < pads.length; i++) {
+                if (pads[i] && pads[i].connected) return true;
+            }
+            return false;
+        }
+
+        function releaseVkeys() {
+            if (window.pc) {
+                vkeys[pc.KEY_W] = vkeys[pc.KEY_S] =
+                vkeys[pc.KEY_A] = vkeys[pc.KEY_D] =
+                vkeys[pc.KEY_SPACE] = false;
+            }
+            vLookX = 0; vLookY = 0;
+            lTid = null; rTid = null;
+            lKnob.style.transform = 'translate(-50%,-50%)';
+            rKnob.style.transform = 'translate(-50%,-50%)';
+        }
+
+        function hideOverlay() {
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+            releaseVkeys();
+        }
+
+        function showOverlay() {
+            overlay.style.opacity = '1';
+            overlay.style.pointerEvents = 'none'; // children handle their own events
+        }
+
+        window.addEventListener('gamepadconnected', function () {
+            hideOverlay();
+        });
+
+        window.addEventListener('gamepaddisconnected', function () {
+            if (!anyPadConnected()) showOverlay();
+        });
+
+        // Hide immediately if a controller is already plugged in
+        if (anyPadConnected()) hideOverlay();
 
         // ── Touch state ──────────────────────────────────────────────
         var lTid = null, lCX = 0, lCY = 0;
@@ -248,12 +298,12 @@
         return d;
     }
 
-    function mkLabel(text, posCSS) {
+    function mkLabel(text, posCSS, parent) {
         var d = document.createElement('div');
         d.className = 'mb-label';
         d.style.cssText += posCSS;
         d.textContent = text;
-        document.body.appendChild(d);
+        (parent || document.body).appendChild(d);
         return d;
     }
 
