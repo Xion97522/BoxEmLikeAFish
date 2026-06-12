@@ -13,7 +13,7 @@ window.CONFIG_FILENAME = "config.json";
 window.INPUT_SETTINGS = {
     useKeyboard: true,
     useMouse: true,
-    useGamepads: false,
+    useGamepads: true,
     useTouch: true
 };
 pc.script.legacy = false;
