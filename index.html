@@ -21070,6 +21070,9 @@ pc.script.createLoadingScreen((app) => {
         setTimeout(function () { ov.parentNode && ov.parentNode.removeChild(ov); }, 600);
     }
 
+    // Expose for storm / external systems
+    window.damagePlayer = hitPlayer;
+
     function applyMat(entity, mat) {
         if (entity.render && entity.render.meshInstances) {
             entity.render.meshInstances.forEach(function (mi) { mi.material = mat; });
@@ -21459,5 +21462,9 @@ pc.script.createLoadingScreen((app) => {
     })();
 
     </script>
+
+    <script src="building.js"></script>
+    <script src="storm.js"></script>
+    <script src="mobile.js"></script>
 </body>
 </html>

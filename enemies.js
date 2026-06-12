@@ -526,6 +526,9 @@
         setTimeout(function () { ov.parentNode && ov.parentNode.removeChild(ov); }, 600);
     }
 
+    // Expose for storm / external systems
+    window.damagePlayer = hitPlayer;
+
     function applyMat(entity, mat) {
         if (entity.render && entity.render.meshInstances) {
             entity.render.meshInstances.forEach(function (mi) { mi.material = mat; });
