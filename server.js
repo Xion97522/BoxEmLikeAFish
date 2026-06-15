@@ -22,6 +22,9 @@ const MIME = {
     '.webm': 'video/webm',
     '.mp4':  'video/mp4',
     '.mov':  'video/quicktime',
+    '.mp3':  'audio/mpeg',
+    '.ogg':  'audio/ogg',
+    '.wav':  'audio/wav',
 };
 
 const server = http.createServer((req, res) => {

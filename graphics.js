@@ -251,6 +251,13 @@
         // Hide crosshair
         if (cross) cross.style.display = 'none';
 
+        // 0 ms: play the GTA V wasted sound once
+        try {
+            var snd = new Audio('/files/wasted_sound.mp3');
+            snd.volume = 1.0;
+            snd.play().catch(function() {});
+        } catch(e) {}
+
         // 0 ms: desaturate + darken game canvas
         if (canvas) {
             canvas.style.transition = 'filter 1.6s ease';
