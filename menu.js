@@ -166,23 +166,33 @@
     }
 
     // ── Enable play button when PC app is ready ───────────────────────
+    function enablePlay() {
+        if (ready) return;
+        ready = true;
+        if (playBtn) {
+            playBtn.textContent = 'PLAY';
+            playBtn.disabled    = false;
+            playBtn.classList.add('zb-ready');
+        }
+    }
+
     var pcWait = setInterval(function () {
-        if (!window.pc || !pc.Application) return;
-        var app = pc.Application.getApplication();
+        if (!window.pc) return;
+        // Support both pc.Application and pc.AppBase (newer PlayCanvas)
+        var getApp = (pc.Application && pc.Application.getApplication) ? pc.Application.getApplication.bind(pc.Application)
+                   : (pc.AppBase    && pc.AppBase.getApplication)    ? pc.AppBase.getApplication.bind(pc.AppBase)
+                   : null;
+        var app = getApp ? getApp() : null;
+        // Also check the global pc.app shorthand used by PlayCanvas
+        if (!app && window.pc && pc.app) app = pc.app;
         if (!app) return;
         clearInterval(pcWait);
-        var enablePlay = function () {
-            ready = true;
-            if (playBtn) {
-                playBtn.textContent = 'PLAY';
-                playBtn.disabled    = false;
-                playBtn.classList.add('zb-ready');
-            }
-        };
-        if (app.root && app.root.findComponents('camera').length) {
+        if (app.root && app.root.findComponents && app.root.findComponents('camera').length) {
             enablePlay();
         } else {
-            app.on('start', function () { setTimeout(enablePlay, 300); });
+            app.once('start', function () { setTimeout(enablePlay, 300); });
+            // Safety fallback: enable after 6 s regardless
+            setTimeout(enablePlay, 6000);
         }
     }, 150);
 
