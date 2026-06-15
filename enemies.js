@@ -22,6 +22,7 @@
     var hpEl      = null;
     var killsEl   = null;
     var killCount = 0;
+    var fishTexture = null;
 
     // ── Boot ──────────────────────────────────────────────────────────
     var wi = setInterval(function () {
@@ -41,6 +42,24 @@
     // ── Init ──────────────────────────────────────────────────────────
     function init(app, cam) {
         buildHUD();
+
+        // Expose HP for graphics system
+        window._playerHP = playerHP;
+
+        // Load fish scale texture
+        var texAsset = new pc.Asset('fishScales', 'texture', { url: '/fish_scales.webp' });
+        app.assets.add(texAsset);
+        texAsset.on('load', function () {
+            fishTexture = texAsset.resource;
+            enemies.forEach(function (en) {
+                if (en.bodyMat) {
+                    en.bodyMat.diffuse    = new pc.Color(1, 1, 1);
+                    en.bodyMat.diffuseMap = fishTexture;
+                    en.bodyMat.update();
+                }
+            });
+        });
+        app.assets.load(texAsset);
 
         SPAWNS.forEach(function (pos, i) { spawnEnemy(app, cam, pos, i); });
 
@@ -121,16 +140,20 @@
         body.addComponent('render', { type: 'box' });
         body.setLocalScale(0.5, 1.1, 0.3);
         var bodyMat = new pc.StandardMaterial();
-        bodyMat.diffuse = new pc.Color(0.65, 0.08, 0.08);
+        bodyMat.diffuse    = new pc.Color(1, 1, 1);
+        bodyMat.shininess  = 60;
+        if (fishTexture) { bodyMat.diffuseMap = fishTexture; }
         bodyMat.update();
         applyMat(body, bodyMat);
 
         var head = new pc.Entity('en-head-' + idx);
         head.addComponent('render', { type: 'sphere' });
-        head.setLocalScale(0.3, 0.3, 0.3);
+        head.setLocalScale(0.35, 0.35, 0.35);
         head.setLocalPosition(0, 0.78, 0);
         var hMat = new pc.StandardMaterial();
-        hMat.diffuse = new pc.Color(0.82, 0.62, 0.48);
+        hMat.diffuse   = new pc.Color(0.75, 0.52, 0.06);  // golden fish head
+        hMat.shininess = 80;
+        hMat.metalness = 0.1;
         hMat.update();
         applyMat(head, hMat);
         body.addChild(head);
@@ -153,13 +176,8 @@
         document.body.appendChild(hpBar);
 
         // ── Enemy object ───────────────────────────────────────────────
-        // animEnt is the entity that has the anim component (= modelEntity when we used addComponent)
-        var animEnt = (hasAnim && modelEntity && modelEntity.anim) ? modelEntity : null;
-
         var en = {
             body:         body,
-            modelEnt:     modelEntity,
-            animEnt:      animEnt,
             bodyMat:      bodyMat,
             meshInstances:meshInstances,
             hp:           ENEMY_HP,
@@ -170,7 +188,7 @@
             stateT:       0,
             attackT:      0,
             hitFlash:     0,
-            hasAnim:      hasAnim,
+            hasAnim:      false,
             basePos:      new pc.Vec3(pos[0], pos[1], pos[2]),
             patrolDst:    new pc.Vec3(pos[0], pos[1], pos[2]),
             hpBar:        hpBar,
@@ -183,14 +201,8 @@
             return en.body.getPosition().clone().add(new pc.Vec3(0, 0.85, 0));
         };
 
-        // ── Animation helper ───────────────────────────────────────────
-        en.setAnim = function (clipName) {
-            if (!en.animEnt) return;
-            try {
-                var bl = en.animEnt.anim && en.animEnt.anim.baseLayer;
-                if (bl && bl.play) bl.play(clipName);
-            } catch(e) {}
-        };
+        // ── Animation helper (no-op — box enemies have no anim) ────────
+        en.setAnim = function (clipName) {};
 
         // ── Material flash on hit ──────────────────────────────────────
         en.setFlash = function (on) {
@@ -254,8 +266,9 @@
                 mi.material.update();
             });
             if (en.bodyMat) {
-                en.bodyMat.diffuse  = new pc.Color(0.65, 0.08, 0.08);
-                en.bodyMat.emissive = new pc.Color(0, 0, 0);
+                en.bodyMat.diffuse    = new pc.Color(1, 1, 1);
+                en.bodyMat.emissive   = new pc.Color(0, 0, 0);
+                en.bodyMat.diffuseMap = fishTexture || null;
                 en.bodyMat.update();
             }
             en.hpInner.style.width = '100%';
@@ -409,7 +422,10 @@
     }
 
     // Expose for storm / external systems
-    window.damagePlayer = hitPlayer;
+    window.damagePlayer = function (dmg) {
+        hitPlayer(dmg);
+        window._playerHP = playerHP;
+    };
 
     function applyMat(entity, mat) {
         if (entity.render && entity.render.meshInstances) {
