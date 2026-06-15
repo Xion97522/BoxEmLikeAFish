@@ -123,6 +123,93 @@
             '  transform:translate(-50%,-50%);',
             '  box-shadow:0 0 4px rgba(255,80,80,0.7);',
             '}',
+            /* ── WASTED overlay ── */
+            '@keyframes wasted-desaturate {',
+            '  0%   { filter:saturate(1) brightness(1); }',
+            '  100% { filter:saturate(0) brightness(0.55); }',
+            '}',
+            '@keyframes wasted-bar-in {',
+            '  0%   { transform:scaleY(0); }',
+            '  100% { transform:scaleY(1); }',
+            '}',
+            '@keyframes wasted-text-in {',
+            '  0%   { opacity:0; transform:translateX(-50%) scale(1.8); letter-spacing:0.35em; }',
+            '  60%  { opacity:1; transform:translateX(-50%) scale(0.96); letter-spacing:0.12em; }',
+            '  100% { opacity:1; transform:translateX(-50%) scale(1); letter-spacing:0.14em; }',
+            '}',
+            '@keyframes wasted-btn-in {',
+            '  0%   { opacity:0; transform:translateX(-50%) translateY(18px); }',
+            '  100% { opacity:1; transform:translateX(-50%) translateY(0); }',
+            '}',
+            '#gfx-wasted-overlay {',
+            '  position:fixed;inset:0;z-index:1200;pointer-events:none;',
+            '  display:flex;align-items:center;justify-content:center;',
+            '  opacity:0;transition:opacity 0.35s ease;',
+            '}',
+            '#gfx-wasted-overlay.visible { opacity:1;pointer-events:all; }',
+            '#gfx-wasted-canvas-shade {',
+            '  position:fixed;inset:0;z-index:1199;pointer-events:none;',
+            '  background:rgba(0,0,0,0);transition:background 1.4s ease;',
+            '}',
+            '#gfx-wasted-canvas-shade.active {',
+            '  background:rgba(0,0,0,0.18);',
+            '}',
+            '.gfx-wasted-bar {',
+            '  position:fixed;left:0;right:0;height:90px;z-index:1201;pointer-events:none;',
+            '  background:#000;transform-origin:top;transform:scaleY(0);',
+            '}',
+            '.gfx-wasted-bar.top    { top:0;    transform-origin:top; }',
+            '.gfx-wasted-bar.bottom { bottom:0; transform-origin:bottom; }',
+            '.gfx-wasted-bar.animate {',
+            '  animation:wasted-bar-in 0.55s cubic-bezier(0.22,1,0.36,1) forwards;',
+            '}',
+            '#gfx-wasted-text {',
+            '  position:fixed;top:50%;left:50%;',
+            '  transform:translateX(-50%) scale(1.8);',
+            '  font-family:"Arial Black","Arial",sans-serif;',
+            '  font-size:clamp(64px,12vw,120px);',
+            '  font-weight:900;',
+            '  color:#c8c8c8;',
+            '  text-transform:uppercase;',
+            '  letter-spacing:0.14em;',
+            '  text-shadow:',
+            '    0 0 0 #000,',
+            '    4px 4px 0 #000,',
+            '    -2px -2px 0 #1a1a1a,',
+            '    0 6px 24px rgba(0,0,0,0.9);',
+            '  pointer-events:none;',
+            '  z-index:1202;',
+            '  opacity:0;',
+            '  white-space:nowrap;',
+            '}',
+            '#gfx-wasted-text.animate {',
+            '  animation:wasted-text-in 0.7s cubic-bezier(0.22,1,0.36,1) forwards;',
+            '}',
+            '#gfx-wasted-btn {',
+            '  position:fixed;top:calc(50% + clamp(56px,9vw,96px));left:50%;',
+            '  transform:translateX(-50%) translateY(18px);',
+            '  font-family:"Segoe UI",Arial,sans-serif;',
+            '  font-size:13px;font-weight:700;letter-spacing:4px;text-transform:uppercase;',
+            '  color:#fff;',
+            '  background:rgba(0,0,0,0.75);',
+            '  border:2px solid rgba(255,255,255,0.35);',
+            '  padding:14px 36px;',
+            '  cursor:pointer;',
+            '  outline:none;',
+            '  z-index:1203;',
+            '  opacity:0;',
+            '  pointer-events:none;',
+            '  transition:background 0.2s,border-color 0.2s,color 0.2s;',
+            '}',
+            '#gfx-wasted-btn.animate {',
+            '  animation:wasted-btn-in 0.5s ease forwards;',
+            '  pointer-events:all;',
+            '}',
+            '#gfx-wasted-btn:hover {',
+            '  background:rgba(255,255,255,0.12);',
+            '  border-color:rgba(255,255,255,0.7);',
+            '}',
+            '#gfx-wasted-btn:active { transform:translateX(-50%) translateY(2px); }',
         ].join('\n');
         document.head.appendChild(s);
     }
@@ -144,6 +231,77 @@
         window._gfxFlash = flash;
         window._gfxVig   = vig;
         window._gfxRing  = ring;
+
+        // ── WASTED overlay pieces ──
+        var shade = document.createElement('div');
+        shade.id = 'gfx-wasted-canvas-shade';
+        document.body.appendChild(shade);
+
+        var barTop = document.createElement('div');
+        barTop.className = 'gfx-wasted-bar top';
+        document.body.appendChild(barTop);
+
+        var barBot = document.createElement('div');
+        barBot.className = 'gfx-wasted-bar bottom';
+        document.body.appendChild(barBot);
+
+        var wastedText = document.createElement('div');
+        wastedText.id = 'gfx-wasted-text';
+        wastedText.textContent = 'WASTED';
+        document.body.appendChild(wastedText);
+
+        var menuBtn = document.createElement('button');
+        menuBtn.id = 'gfx-wasted-btn';
+        menuBtn.textContent = 'GO BACK TO MAIN MENU';
+        menuBtn.addEventListener('click', function () {
+            window.location.reload();
+        });
+        document.body.appendChild(menuBtn);
+
+        window._gfxWastedShown = false;
+    }
+
+    // ── WASTED screen ─────────────────────────────────────────────────
+    function showWasted() {
+        if (window._gfxWastedShown) return;
+        window._gfxWastedShown = true;
+
+        // Exit pointer lock
+        try { document.exitPointerLock(); } catch(e) {}
+
+        var canvas   = document.getElementById('application-canvas');
+        var shade    = document.getElementById('gfx-wasted-canvas-shade');
+        var barTop   = document.querySelector('.gfx-wasted-bar.top');
+        var barBot   = document.querySelector('.gfx-wasted-bar.bottom');
+        var text     = document.getElementById('gfx-wasted-text');
+        var btn      = document.getElementById('gfx-wasted-btn');
+        var cross    = document.getElementById('gfx-crosshair');
+
+        // Hide crosshair
+        if (cross) cross.style.display = 'none';
+
+        // 0 ms: start desaturating the game canvas
+        if (canvas) {
+            canvas.style.transition = 'filter 1.6s ease';
+            canvas.style.filter = 'saturate(0) brightness(0.5)';
+        }
+        if (shade) shade.classList.add('active');
+
+        // 200 ms: cinematic black bars slide in
+        setTimeout(function () {
+            if (barTop) barTop.classList.add('animate');
+            if (barBot) barBot.classList.add('animate');
+        }, 200);
+
+        // 700 ms: WASTED text slams in
+        setTimeout(function () {
+            if (text) text.classList.add('animate');
+        }, 700);
+
+        // 1400 ms: menu button fades up
+        setTimeout(function () {
+            if (btn) btn.classList.add('animate');
+        }, 1400);
     }
 
     // ── Screen-shake & flash on damage ────────────────────────────────
@@ -154,6 +312,11 @@
             window.damagePlayer = function (amt) {
                 orig(amt);
                 triggerDamageEffects(amt);
+                // Check for death
+                var hp = window._playerHP !== undefined ? window._playerHP : 100;
+                if (hp <= 0 && !window._gfxWastedShown) {
+                    setTimeout(showWasted, 300);
+                }
             };
         };
         tryPatch();
