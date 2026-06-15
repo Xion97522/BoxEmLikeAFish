@@ -61,10 +61,10 @@
 
         // Pre-title
         content.appendChild(el('div', {
-            class: 'zb-fadein zb-d03',
+            class: 'zb-fadein zb-d03 text-center',
             style: 'font-size:10px;letter-spacing:10px;text-transform:uppercase;' +
                    'color:#1db31d;font-weight:700;margin-bottom:18px;opacity:0;',
-            text: 'THE  ULTIMATE  FISH  BOXING  GAME',
+            text: 'CRAZE STUDIOS PRESENTS...',
         }));
 
         // Main title
