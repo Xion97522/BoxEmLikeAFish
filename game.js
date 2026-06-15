@@ -77,6 +77,9 @@ let enemies = [];
 
 // World obstacle boxes (AABB for collision: {cx,cz,hw,hd} half-width/depth)
 let obstacles = [];
+
+// Build piece collision registry — populated by building.js when pieces are placed
+window.buildPieces = [];
 // Three.js meshes for enemies stored here (enemies[i].mesh)
 
 // Particles
@@ -735,8 +738,84 @@ function finishReload() {
 }
 
 // ── Collision ─────────────────────────────────────────────────────────
-function resolvePlayerObstacle(px, pz, radius) {
+
+// Returns the Y value of a build piece's top surface at world XZ, or null if outside footprint.
+function surfaceAtPos(bp, px, pz) {
+    const lx =  bp.cosYaw * (px - bp.cx) + bp.sinYaw * (pz - bp.cz);
+    const lz = -bp.sinYaw * (px - bp.cx) + bp.cosYaw * (pz - bp.cz);
+    if (Math.abs(lx) > bp.hw || Math.abs(lz) > bp.hd) return null;
+    // sy: centre-of-surface Y + slope along local-Z using pitch tilt
+    return bp.cy + bp.hh * bp.cosTilt + lz * bp.sinTilt;
+}
+
+// Returns the highest walkable floor Y at (px,pz).
+// currentFeetY: player feet Y before this step — prevents snapping up through overhead platforms.
+function getFloorAt(px, pz, currentFeetY) {
+    let highest = 0;  // arena floor is always y = 0
+    for (const bp of (window.buildPieces || [])) {
+        if (bp.label === 'WALL') continue;
+        const sy = surfaceAtPos(bp, px, pz);
+        // Only surfaces that are at or below current feet position (+ small step tolerance)
+        if (sy !== null && sy <= currentFeetY + 0.55 && sy > highest) {
+            highest = sy;
+        }
+    }
+    return highest;
+}
+
+function resolvePlayerObstacle(px, pz, radius, eyeY) {
     let nx = px, nz = pz;
+
+    // ── Arena / crate obstacles (axis-aligned) ──
+    for (const ob of obstacles) {
+        const dx = Math.abs(nx - ob.cx);
+        const dz = Math.abs(nz - ob.cz);
+        const ox = ob.hw + radius;
+        const oz = ob.hd + radius;
+        if (dx < ox && dz < oz) {
+            const overlapX = ox - dx;
+            const overlapZ = oz - dz;
+            if (overlapX < overlapZ) {
+                nx += (nx < ob.cx ? -overlapX : overlapX);
+            } else {
+                nz += (nz < ob.cz ? -overlapZ : overlapZ);
+            }
+        }
+    }
+
+    // ── Build walls (rotated AABB) ──
+    const feetY = (eyeY !== undefined ? eyeY : EYE_H) - EYE_H;
+    const headY = feetY + 2.0;
+    for (const bp of (window.buildPieces || [])) {
+        if (bp.label !== 'WALL') continue;
+        // Skip if player height range doesn't overlap wall height range
+        if (headY < bp.cy - bp.hh || feetY > bp.cy + bp.hh) continue;
+        // Transform to wall-local XZ
+        const lx =  bp.cosYaw * (nx - bp.cx) + bp.sinYaw * (nz - bp.cz);
+        const lz = -bp.sinYaw * (nx - bp.cx) + bp.cosYaw * (nz - bp.cz);
+        const ox = bp.hw + radius;
+        const oz = bp.hd + radius;
+        if (Math.abs(lx) < ox && Math.abs(lz) < oz) {
+            const overlapX = ox - Math.abs(lx);
+            const overlapZ = oz - Math.abs(lz);
+            if (overlapX < overlapZ) {
+                const delta = lx < 0 ? -overlapX : overlapX;
+                nx += bp.cosYaw * delta;
+                nz += bp.sinYaw * delta;
+            } else {
+                const delta = lz < 0 ? -overlapZ : overlapZ;
+                nx += -bp.sinYaw * delta;
+                nz +=  bp.cosYaw * delta;
+            }
+        }
+    }
+
+    return { x: nx, z: nz };
+}
+
+function resolveEnemyObstacle(ex, ez, radius) {
+    // Enemies only collide with arena obstacles (not build walls — keeps it simple)
+    let nx = ex, nz = ez;
     for (const ob of obstacles) {
         const dx = Math.abs(nx - ob.cx);
         const dz = Math.abs(nz - ob.cz);
@@ -753,10 +832,6 @@ function resolvePlayerObstacle(px, pz, radius) {
         }
     }
     return { x: nx, z: nz };
-}
-
-function resolveEnemyObstacle(ex, ez, radius) {
-    return resolvePlayerObstacle(ex, ez, radius);
 }
 
 // ── Shooting ──────────────────────────────────────────────────────────
@@ -1053,13 +1128,14 @@ function update(dt) {
     let nz = player.pos.z + player.vel.z * dt;
     let ny = player.pos.y + player.vel.y * dt;
 
-    // Collision
-    const res = resolvePlayerObstacle(nx, nz, 0.35);
+    // XZ collision (arena walls, crates, and build walls)
+    const res = resolvePlayerObstacle(nx, nz, 0.35, ny);
     nx = res.x; nz = res.z;
 
-    // Floor
-    if (ny - EYE_H <= 0.0) {
-        ny = EYE_H;
+    // Floor — arena floor (y=0) + any build floors/ramps the player is standing on
+    const floorY = getFloorAt(nx, nz, player.pos.y - EYE_H);
+    if (ny - EYE_H <= floorY) {
+        ny = floorY + EYE_H;
         player.vel.y = 0;
         player.grounded = true;
     } else {

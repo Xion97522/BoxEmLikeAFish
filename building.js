@@ -193,6 +193,32 @@
         ghostMat.update();
     }
 
+    // ── Build piece collision helpers ─────────────────────────────────
+    function makeBpCollData(p, pos, rot) {
+        var yawRad  = rot.y  * Math.PI / 180;
+        var tiltRad = rot.x  * Math.PI / 180;
+        return {
+            id:       'bld-' + Date.now() + '-' + Math.random(),
+            label:    p.label,
+            cx:       pos.x,  cy: pos.y,  cz: pos.z,
+            hw:       p.w / 2, hh: p.h / 2, hd: p.d / 2,
+            cosYaw:   Math.cos(yawRad),
+            sinYaw:   Math.sin(yawRad),
+            cosTilt:  Math.cos(tiltRad),
+            sinTilt:  Math.sin(tiltRad),
+        };
+    }
+
+    function pushCollData(coll) {
+        if (window.buildPieces) window.buildPieces.push(coll);
+    }
+
+    function removeCollData(id) {
+        if (!window.buildPieces) return;
+        var idx = window.buildPieces.findIndex(function (c) { return c.id === id; });
+        if (idx !== -1) window.buildPieces.splice(idx, 1);
+    }
+
     // ── Place piece ───────────────────────────────────────────────────
     function placePiece(cam, app) {
         if (!ghostEnt || !ghostEnt.enabled) return;
@@ -214,10 +240,14 @@
         ent.setEulerAngles(rot.x, rot.y, rot.z);
         app.root.addChild(ent);
 
+        var coll = makeBpCollData(p, pos, rot);
+        pushCollData(coll);
+
         builtPieces.push({
             ent: ent, mat: mat,
             baseColor: [p.color[0], p.color[1], p.color[2]],
-            scaleX: p.w, scaleY: p.h, scaleZ: p.d
+            scaleX: p.w, scaleY: p.h, scaleZ: p.d,
+            collId: coll.id
         });
 
         playBuildSound();
@@ -228,6 +258,7 @@
         if (!builtPieces.length) return;
         var bp = builtPieces.pop();
         if (selectedPiece === bp) deselectPiece();
+        if (bp.collId) removeCollData(bp.collId);
         bp.ent.destroy();
         showNotif('REMOVED  (' + builtPieces.length + ' placed)');
         updateHUD();
@@ -330,15 +361,30 @@
 
     function rotateSelected() {
         if (!selectedPiece) return;
-        var cur = selectedPiece.ent.getEulerAngles();
-        selectedPiece.ent.setEulerAngles(cur.x, cur.y + 90, cur.z);
-        showNotif('ROTATED  ' + Math.round(selectedPiece.ent.getEulerAngles().y) + '\u00b0');
+        var cur    = selectedPiece.ent.getEulerAngles();
+        var newYaw = cur.y + 90;
+        selectedPiece.ent.setEulerAngles(cur.x, newYaw, cur.z);
+        // Keep collision data in sync
+        if (selectedPiece.collId && window.buildPieces) {
+            for (var i = 0; i < window.buildPieces.length; i++) {
+                if (window.buildPieces[i].id === selectedPiece.collId) {
+                    var yawRad = newYaw * Math.PI / 180;
+                    window.buildPieces[i].cosYaw = Math.cos(yawRad);
+                    window.buildPieces[i].sinYaw = Math.sin(yawRad);
+                    break;
+                }
+            }
+        }
+        showNotif('ROTATED  ' + Math.round(newYaw) + '\u00b0');
     }
 
     function deleteSelected(app) {
         if (!selectedPiece) return;
         var idx = builtPieces.indexOf(selectedPiece);
-        if (idx !== -1) builtPieces.splice(idx, 1);
+        if (idx !== -1) {
+            if (selectedPiece.collId) removeCollData(selectedPiece.collId);
+            builtPieces.splice(idx, 1);
+        }
         selectedPiece.ent.destroy();
         selectedPiece = null;
         hoveredPiece  = null;
