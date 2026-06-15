@@ -71,12 +71,12 @@
         var titleWrap = el('div', { class: 'zb-fadein', style: 'text-align:center;opacity:0;' });
         titleWrap.innerHTML =
             '<div style="font-size:clamp(48px,7.5vw,88px);font-weight:900;letter-spacing:-1px;' +
-            'line-height:0.88;color:#fff;' +
+            'line-height:0.88;color:#fff;font-family:GroovyTexbox,sans-serif;' +
             'text-shadow:0 0 60px rgba(29,179,29,0.25),0 0 120px rgba(29,179,29,0.1);">' +
             'BOX EM</div>' +
             '<div class="zb-glitch" data-text="LIKE A FISH" ' +
             'style="font-size:clamp(52px,8.5vw,96px);font-weight:900;letter-spacing:-1px;' +
-            'line-height:0.88;color:#1db31d;' +
+            'line-height:0.88;color:#1db31d;font-family:GroovyTexbox,sans-serif;' +
             'text-shadow:0 0 40px rgba(29,179,29,0.5),0 0 80px rgba(29,179,29,0.2);">' +
             'LIKE A FISH</div>';
         content.appendChild(titleWrap);
@@ -263,6 +263,11 @@
     function injectStyles() {
         var s = document.createElement('style');
         s.textContent = [
+            '@font-face {',
+            '  font-family:"GroovyTexbox";',
+            '  src:url("/files/fonts/GroovyTexboxDemo-BL5pw.ttf") format("truetype");',
+            '  font-weight:normal; font-style:normal;',
+            '}',
             '@keyframes zbFadeUp {',
             '  from { opacity:0; transform:translateY(14px); }',
             '  to   { opacity:1; transform:translateY(0); }',
