@@ -1,4 +1,4 @@
-// storm.js — Battle Royale storm circle for Zone Breach
+// storm.js — Battle Royale storm circle for Box Em Like a Fish
 (function () {
     'use strict';
 
@@ -51,13 +51,26 @@
     // ── Storm ring (pillar walls) ─────────────────────────────────────
     function buildRing(app) {
         var mat = new pc.StandardMaterial();
-        mat.diffuse    = new pc.Color(0.2,  0.3,  1.0);
-        mat.emissive   = new pc.Color(0.08, 0.15, 0.7);
-        mat.opacity    = 0.50;
+        mat.diffuse    = new pc.Color(0.45, 0.5,  1.0);
+        mat.emissive   = new pc.Color(0.12, 0.18, 0.8);
+        mat.emissiveIntensity = 0.6;
+        mat.opacity    = 0.28;
         mat.blendType  = pc.BLEND_NORMAL;
         mat.depthWrite = false;
         mat.cull       = pc.CULLFACE_NONE;
         mat.update();
+
+        // Load electric storm texture
+        var texAsset = new pc.Asset('stormTex', 'texture', { url: '/storm_texture.gif' });
+        app.assets.add(texAsset);
+        texAsset.on('load', function () {
+            mat.diffuseMap  = texAsset.resource;
+            mat.emissiveMap = texAsset.resource;
+            mat.emissiveIntensity = 0.55;
+            mat.opacity = 0.28;
+            mat.update();
+        });
+        app.assets.load(texAsset);
 
         for (var i = 0; i < PILLAR_N; i++) {
             var e = new pc.Entity('storm-p' + i);
