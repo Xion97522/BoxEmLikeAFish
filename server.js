@@ -19,6 +19,9 @@ const MIME = {
     '.glb':  'model/gltf-binary',
     '.gltf': 'model/gltf+json',
     '.fbx':  'application/octet-stream',
+    '.webm': 'video/webm',
+    '.mp4':  'video/mp4',
+    '.mov':  'video/quicktime',
 };
 
 const server = http.createServer((req, res) => {

@@ -124,69 +124,36 @@
             '  box-shadow:0 0 4px rgba(255,80,80,0.7);',
             '}',
             /* ── WASTED overlay ── */
-            '@keyframes wasted-desaturate {',
-            '  0%   { filter:saturate(1) brightness(1); }',
-            '  100% { filter:saturate(0) brightness(0.55); }',
-            '}',
             '@keyframes wasted-bar-in {',
             '  0%   { transform:scaleY(0); }',
             '  100% { transform:scaleY(1); }',
-            '}',
-            '@keyframes wasted-text-in {',
-            '  0%   { opacity:0; transform:translateX(-50%) scale(1.8); letter-spacing:0.35em; }',
-            '  60%  { opacity:1; transform:translateX(-50%) scale(0.96); letter-spacing:0.12em; }',
-            '  100% { opacity:1; transform:translateX(-50%) scale(1); letter-spacing:0.14em; }',
             '}',
             '@keyframes wasted-btn-in {',
             '  0%   { opacity:0; transform:translateX(-50%) translateY(18px); }',
             '  100% { opacity:1; transform:translateX(-50%) translateY(0); }',
             '}',
-            '#gfx-wasted-overlay {',
-            '  position:fixed;inset:0;z-index:1200;pointer-events:none;',
-            '  display:flex;align-items:center;justify-content:center;',
-            '  opacity:0;transition:opacity 0.35s ease;',
-            '}',
-            '#gfx-wasted-overlay.visible { opacity:1;pointer-events:all; }',
             '#gfx-wasted-canvas-shade {',
             '  position:fixed;inset:0;z-index:1199;pointer-events:none;',
             '  background:rgba(0,0,0,0);transition:background 1.4s ease;',
             '}',
-            '#gfx-wasted-canvas-shade.active {',
-            '  background:rgba(0,0,0,0.18);',
-            '}',
+            '#gfx-wasted-canvas-shade.active { background:rgba(0,0,0,0.22); }',
             '.gfx-wasted-bar {',
             '  position:fixed;left:0;right:0;height:90px;z-index:1201;pointer-events:none;',
-            '  background:#000;transform-origin:top;transform:scaleY(0);',
+            '  background:#000;transform:scaleY(0);',
             '}',
             '.gfx-wasted-bar.top    { top:0;    transform-origin:top; }',
             '.gfx-wasted-bar.bottom { bottom:0; transform-origin:bottom; }',
             '.gfx-wasted-bar.animate {',
             '  animation:wasted-bar-in 0.55s cubic-bezier(0.22,1,0.36,1) forwards;',
             '}',
-            '#gfx-wasted-text {',
-            '  position:fixed;top:50%;left:50%;',
-            '  transform:translateX(-50%) scale(1.8);',
-            '  font-family:"Arial Black","Arial",sans-serif;',
-            '  font-size:clamp(64px,12vw,120px);',
-            '  font-weight:900;',
-            '  color:#c8c8c8;',
-            '  text-transform:uppercase;',
-            '  letter-spacing:0.14em;',
-            '  text-shadow:',
-            '    0 0 0 #000,',
-            '    4px 4px 0 #000,',
-            '    -2px -2px 0 #1a1a1a,',
-            '    0 6px 24px rgba(0,0,0,0.9);',
-            '  pointer-events:none;',
-            '  z-index:1202;',
-            '  opacity:0;',
-            '  white-space:nowrap;',
+            '#gfx-wasted-video {',
+            '  position:fixed;inset:0;z-index:1202;pointer-events:none;',
+            '  width:100%;height:100%;object-fit:cover;',
+            '  opacity:0;transition:opacity 0.1s;',
             '}',
-            '#gfx-wasted-text.animate {',
-            '  animation:wasted-text-in 0.7s cubic-bezier(0.22,1,0.36,1) forwards;',
-            '}',
+            '#gfx-wasted-video.visible { opacity:1; }',
             '#gfx-wasted-btn {',
-            '  position:fixed;top:calc(50% + clamp(56px,9vw,96px));left:50%;',
+            '  position:fixed;bottom:18%;left:50%;',
             '  transform:translateX(-50%) translateY(18px);',
             '  font-family:"Segoe UI",Arial,sans-serif;',
             '  font-size:13px;font-weight:700;letter-spacing:4px;text-transform:uppercase;',
@@ -245,10 +212,14 @@
         barBot.className = 'gfx-wasted-bar bottom';
         document.body.appendChild(barBot);
 
-        var wastedText = document.createElement('div');
-        wastedText.id = 'gfx-wasted-text';
-        wastedText.textContent = 'WASTED';
-        document.body.appendChild(wastedText);
+        // GTA-style transparent WASTED video overlay
+        var wastedVid = document.createElement('video');
+        wastedVid.id = 'gfx-wasted-video';
+        wastedVid.src = '/files/wasted_effect.webm';
+        wastedVid.muted = false;
+        wastedVid.playsInline = true;
+        wastedVid.preload = 'auto';
+        document.body.appendChild(wastedVid);
 
         var menuBtn = document.createElement('button');
         menuBtn.id = 'gfx-wasted-btn';
@@ -269,21 +240,21 @@
         // Exit pointer lock
         try { document.exitPointerLock(); } catch(e) {}
 
-        var canvas   = document.getElementById('application-canvas');
-        var shade    = document.getElementById('gfx-wasted-canvas-shade');
-        var barTop   = document.querySelector('.gfx-wasted-bar.top');
-        var barBot   = document.querySelector('.gfx-wasted-bar.bottom');
-        var text     = document.getElementById('gfx-wasted-text');
-        var btn      = document.getElementById('gfx-wasted-btn');
-        var cross    = document.getElementById('gfx-crosshair');
+        var canvas = document.getElementById('application-canvas');
+        var shade  = document.getElementById('gfx-wasted-canvas-shade');
+        var barTop = document.querySelector('.gfx-wasted-bar.top');
+        var barBot = document.querySelector('.gfx-wasted-bar.bottom');
+        var vid    = document.getElementById('gfx-wasted-video');
+        var btn    = document.getElementById('gfx-wasted-btn');
+        var cross  = document.getElementById('gfx-crosshair');
 
         // Hide crosshair
         if (cross) cross.style.display = 'none';
 
-        // 0 ms: start desaturating the game canvas
+        // 0 ms: desaturate + darken game canvas
         if (canvas) {
             canvas.style.transition = 'filter 1.6s ease';
-            canvas.style.filter = 'saturate(0) brightness(0.5)';
+            canvas.style.filter = 'saturate(0) brightness(0.45)';
         }
         if (shade) shade.classList.add('active');
 
@@ -293,15 +264,26 @@
             if (barBot) barBot.classList.add('animate');
         }, 200);
 
-        // 700 ms: WASTED text slams in
+        // 500 ms: play the actual GTA 5 WASTED video (transparent overlay)
         setTimeout(function () {
-            if (text) text.classList.add('animate');
-        }, 700);
+            if (vid) {
+                vid.currentTime = 0;
+                vid.classList.add('visible');
+                var playPromise = vid.play();
+                if (playPromise && playPromise.catch) {
+                    playPromise.catch(function () {
+                        // Autoplay blocked — show video anyway (muted fallback)
+                        vid.muted = true;
+                        vid.play();
+                    });
+                }
+            }
+        }, 500);
 
-        // 1400 ms: menu button fades up
+        // 2200 ms: show menu button
         setTimeout(function () {
             if (btn) btn.classList.add('animate');
-        }, 1400);
+        }, 2200);
     }
 
     // ── Screen-shake & flash on damage ────────────────────────────────
