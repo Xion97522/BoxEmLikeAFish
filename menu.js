@@ -4,7 +4,7 @@
 
     var menuEl  = null;
     var playBtn = null;
-    var ready   = false;   // true once PlayCanvas is initialised
+    var ready   = false;
 
     // ── Build the DOM menu immediately ────────────────────────────────
     function build() {
@@ -14,7 +14,7 @@
             id: 'zb-menu',
             style: [
                 'position:fixed;inset:0;z-index:1000',
-                'background:#060c0d',
+                'background:#0a0502',
                 'display:flex;flex-direction:column;align-items:center;justify-content:center',
                 'transition:opacity 0.9s ease',
                 'overflow:hidden',
@@ -22,70 +22,68 @@
             ].join(';'),
         });
 
-        // ── Animated grid background ──────────────────────────────────
-        var grid = el('canvas', { id: 'zb-grid', style: 'position:absolute;inset:0;z-index:0;opacity:0.18;' });
+        // ── Animated perspective grid ──────────────────────────────────
+        var grid = el('canvas', { id: 'zb-grid', style: 'position:absolute;inset:0;z-index:1;' });
         menuEl.appendChild(grid);
 
         // ── Scanline overlay ──────────────────────────────────────────
         menuEl.appendChild(el('div', {
-            style: 'position:absolute;inset:0;z-index:1;pointer-events:none;' +
-                   'background:repeating-linear-gradient(0deg,' +
-                   'rgba(0,0,0,0.06) 0px,rgba(0,0,0,0.06) 1px,' +
-                   'transparent 1px,transparent 3px);',
+            style: 'position:absolute;inset:0;z-index:10;pointer-events:none;' +
+                   'background:linear-gradient(to bottom,' +
+                   'rgba(255,255,255,0),rgba(255,255,255,0) 50%,' +
+                   'rgba(0,0,0,0.2) 50%,rgba(0,0,0,0.2));' +
+                   'background-size:100% 4px;',
         }));
 
         // ── Vignette ──────────────────────────────────────────────────
         menuEl.appendChild(el('div', {
-            style: 'position:absolute;inset:0;z-index:1;pointer-events:none;' +
-                   'background:radial-gradient(ellipse at 50% 45%,' +
-                   'transparent 30%,rgba(0,0,0,0.75) 100%);',
+            style: 'position:absolute;inset:0;z-index:11;pointer-events:none;' +
+                   'background:radial-gradient(circle at center,transparent 30%,#0a0502 100%);',
         }));
 
         // ── Top accent line ───────────────────────────────────────────
         menuEl.appendChild(el('div', {
-            style: 'position:absolute;top:0;left:0;right:0;height:2px;z-index:2;' +
-                   'background:linear-gradient(90deg,transparent 0%,#1db31d 50%,transparent 100%);',
+            style: 'position:absolute;top:40px;left:0;right:0;height:1px;z-index:20;opacity:0.5;' +
+                   'background:linear-gradient(90deg,transparent 0%,#FF6A00 50%,transparent 100%);',
         }));
 
         // ── Bottom accent line ────────────────────────────────────────
         menuEl.appendChild(el('div', {
-            style: 'position:absolute;bottom:0;left:0;right:0;height:1px;z-index:2;' +
-                   'background:linear-gradient(90deg,transparent 0%,rgba(29,179,29,0.4) 50%,transparent 100%);',
+            style: 'position:absolute;bottom:40px;left:0;right:0;height:1px;z-index:20;opacity:0.5;' +
+                   'background:linear-gradient(90deg,transparent 0%,#FF6A00 50%,transparent 100%);',
         }));
 
         // ── Content ───────────────────────────────────────────────────
         var content = el('div', {
-            style: 'position:relative;z-index:10;display:flex;flex-direction:column;' +
-                   'align-items:center;gap:0;',
+            style: 'position:relative;z-index:30;display:flex;flex-direction:column;' +
+                   'align-items:center;gap:0;padding-top:5vh;height:100%;justify-content:center;',
         });
 
         // Pre-title
         content.appendChild(el('div', {
-            class: 'zb-fadein zb-d03 text-center',
-            style: 'font-size:10px;letter-spacing:10px;text-transform:uppercase;' +
-                   'color:#1db31d;font-weight:700;margin-bottom:18px;opacity:0;',
+            class: 'zb-fadein zb-d03',
+            style: 'font-size:10px;letter-spacing:8px;text-transform:uppercase;' +
+                   'color:#cccccc;font-weight:400;margin-bottom:20px;opacity:0;',
             text: 'CRAZE STUDIOS PRESENTS...',
         }));
 
         // Main title
-        var titleWrap = el('div', { class: 'zb-fadein', style: 'text-align:center;opacity:0;' });
+        var titleWrap = el('div', { class: 'zb-fadein', style: 'text-align:center;opacity:0;line-height:1.1;' });
         titleWrap.innerHTML =
-            '<div style="font-size:clamp(48px,7.5vw,88px);font-weight:900;letter-spacing:-1px;' +
-            'line-height:0.88;color:#fff;font-family:GroovyTexbox,sans-serif;' +
-            'text-shadow:0 0 60px rgba(29,179,29,0.25),0 0 120px rgba(29,179,29,0.1);">' +
+            '<div style="font-size:clamp(48px,8vw,8rem);font-weight:900;letter-spacing:-1px;' +
+            'line-height:0.9;color:#fff;font-family:GroovyTexbox,sans-serif;margin:0;">' +
             'BOX EM</div>' +
-            '<div class="zb-glitch" data-text="LIKE A FISH" ' +
-            'style="font-size:clamp(52px,8.5vw,96px);font-weight:900;letter-spacing:-1px;' +
-            'line-height:0.88;color:#1db31d;font-family:GroovyTexbox,sans-serif;' +
-            'text-shadow:0 0 40px rgba(29,179,29,0.5),0 0 80px rgba(29,179,29,0.2);">' +
+            '<div class="zb-pulse-glow" ' +
+            'style="font-size:clamp(38px,6vw,6rem);font-weight:900;letter-spacing:-1px;' +
+            'line-height:0.9;color:#FF6A00;font-family:GroovyTexbox,sans-serif;margin:0;">' +
             'LIKE A FISH</div>';
         content.appendChild(titleWrap);
 
         // Divider
         content.appendChild(el('div', {
             class: 'zb-fadein zb-d04',
-            style: 'width:200px;height:1px;margin:32px 0 36px;opacity:0;' +
-                   'background:linear-gradient(90deg,transparent,rgba(29,179,29,0.55),transparent);',
+            style: 'width:150px;height:2px;margin:28px 0 32px;opacity:0;' +
+                   'background:#FF6A00;',
         }));
 
         // PLAY button
@@ -100,55 +98,60 @@
         content.appendChild(playBtn);
 
         // Sub-hint beneath button
-        var hint = el('div', {
+        content.appendChild(el('div', {
             class: 'zb-fadein zb-d06',
             style: 'margin-top:14px;font-size:9px;letter-spacing:2px;' +
-                   'color:rgba(255,255,255,0.28);opacity:0;text-transform:uppercase;',
-            text: 'Press  ENTER  or  click  to  start',
-        });
-        content.appendChild(hint);
+                   'color:rgba(255,255,255,0.4);opacity:0;text-transform:none;',
+            text: 'Press ENTER or click to start',
+        }));
 
-        // Controls grid
-        var grid2 = el('div', {
+        // Controls grid — inline "KEY / Desc" style
+        var ctrlGrid = el('div', {
             class: 'zb-fadein zb-d07',
-            style: 'margin-top:52px;display:grid;grid-template-columns:repeat(3,1fr);' +
-                   'gap:10px 44px;opacity:0;',
+            style: 'margin-top:auto;margin-bottom:2rem;display:grid;' +
+                   'grid-template-columns:repeat(3,1fr);gap:10px 48px;opacity:0;font-size:11px;',
         });
         [
-            ['WASD',  'Move'],       ['MOUSE',  'Aim / Shoot'],  ['R',    'Reload'],
-            ['Q',     'Build Mode'], ['F',      'Place Piece'],   ['E',    'Cycle Piece'],
-            ['1 2 3', 'Weapons'],    ['SPACE',  'Jump'],          ['SHIFT','Sprint'],
+            ['WASD',  'Move'],       ['MOUSE', 'Aim+Shoot'],  ['R',     'Reload'],
+            ['Q',     'Build Mode'], ['F',     'Place Piece'], ['E',     'Cycle Piece'],
+            ['1 2 3', 'Weapons'],    ['SPACE', 'Jump'],        ['SHIFT', 'Sprint'],
         ].forEach(function (b) {
-            var c2 = el('div', { style: 'text-align:center;' });
+            var c2 = el('div', { style: 'display:flex;gap:6px;align-items:center;' });
             c2.innerHTML =
-                '<div style="font-size:10px;letter-spacing:2px;color:#1db31d;font-weight:800;">' + b[0] + '</div>' +
-                '<div style="font-size:8px;letter-spacing:1px;color:rgba(255,255,255,0.32);margin-top:2px;">' + b[1] + '</div>';
-            grid2.appendChild(c2);
+                '<span style="color:#FF6A00;font-weight:700;letter-spacing:1px;">' + b[0] + '</span>' +
+                '<span style="color:rgba(255,255,255,0.4);">/</span>' +
+                '<span style="color:#cccccc;">' + b[1] + '</span>';
+            ctrlGrid.appendChild(c2);
         });
-        content.appendChild(grid2);
+        content.appendChild(ctrlGrid);
 
         menuEl.appendChild(content);
 
         // Version tag
         menuEl.appendChild(el('div', {
-            style: 'position:absolute;bottom:20px;right:24px;z-index:10;' +
-                   'font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.18);',
+            style: 'position:absolute;bottom:15px;right:25px;z-index:30;' +
+                   'font-size:9px;letter-spacing:2px;color:rgba(255,255,255,0.25);',
             text: 'BOX EM LIKE A FISH  v1.0',
         }));
 
-        // Corner brackets
-        ['top:20px;left:20px', 'top:20px;right:20px', 'bottom:20px;left:20px', 'bottom:20px;right:20px']
-            .forEach(function (pos, i) {
-                var b2 = el('div', {
-                    style: 'position:absolute;' + pos + ';z-index:3;width:22px;height:22px;' +
-                           'border-color:rgba(29,179,29,0.35);border-style:solid;border-width:0;',
-                });
-                if (i === 0) b2.style.borderTopWidth = b2.style.borderLeftWidth = '1px';
-                if (i === 1) b2.style.borderTopWidth = b2.style.borderRightWidth = '1px';
-                if (i === 2) b2.style.borderBottomWidth = b2.style.borderLeftWidth = '1px';
-                if (i === 3) b2.style.borderBottomWidth = b2.style.borderRightWidth = '1px';
-                menuEl.appendChild(b2);
-            });
+        // Corner brackets — orange, 30px, 2px border
+        [
+            { top: '20px', left: '20px' },
+            { top: '20px', right: '20px' },
+            { bottom: '20px', left: '20px' },
+            { bottom: '20px', right: '20px' },
+        ].forEach(function (pos, i) {
+            var b2 = el('div', { style: 'position:absolute;z-index:20;width:30px;height:30px;opacity:0.6;' });
+            Object.keys(pos).forEach(function (k) { b2.style[k] = pos[k]; });
+            b2.style.borderColor = '#FF6A00';
+            b2.style.borderStyle = 'solid';
+            b2.style.borderWidth = '0';
+            if (pos.top)    b2.style.borderTopWidth = '2px';
+            if (pos.bottom) b2.style.borderBottomWidth = '2px';
+            if (pos.left)   b2.style.borderLeftWidth = '2px';
+            if (pos.right)  b2.style.borderRightWidth = '2px';
+            menuEl.appendChild(b2);
+        });
 
         document.body.appendChild(menuEl);
 
@@ -189,7 +192,6 @@
         menuEl.style.opacity = '0';
         menuEl.style.pointerEvents = 'none';
 
-        // Request pointer lock after short delay (fade is 0.9s)
         setTimeout(function () {
             var canvas = document.getElementById('application-canvas');
             if (canvas && canvas.requestPointerLock) {
@@ -205,10 +207,10 @@
         }, 950);
     }
 
-    // ── Animated perspective grid ─────────────────────────────────────
+    // ── Animated perspective grid (Ember: forward-scrolling) ──────────
     function startGrid(canvas) {
         var ctx = canvas.getContext('2d');
-        var W, H;
+        var W, H, offset = 0;
 
         function resize() {
             W = canvas.width  = window.innerWidth;
@@ -217,44 +219,45 @@
         resize();
         window.addEventListener('resize', resize);
 
-        var t = 0;
         (function frame() {
             if (!menuEl) return;
             requestAnimationFrame(frame);
-            t += 0.004;
 
             ctx.clearRect(0, 0, W, H);
-            ctx.strokeStyle = '#1db31d';
-            ctx.lineWidth   = 0.6;
 
-            var COLS = 14, ROWS = 10;
-            var horizon = H * 0.48;
-            var vp = { x: W / 2, y: horizon };
-            var spread = W * 1.6;
-            var bottom = H + 40;
+            var horizonY = H * 0.4;
+            var fov      = 300;
+            offset = (offset + 2) % 40;
 
-            // Vertical lines
-            for (var i = 0; i <= COLS; i++) {
-                var fx   = -spread / 2 + (i / COLS) * spread;
-                var topX = vp.x + fx * 0.01;
+            ctx.strokeStyle = '#FF6A00';
+            ctx.lineWidth   = 1;
+
+            // Horizontal lines — scroll forward toward viewer
+            for (var z = 10; z < 1000; z += 40) {
+                var adjZ = z - offset;
+                if (adjZ <= 0) continue;
+                var scale = fov / adjZ;
+                var y = horizonY + scale * 50;
+                if (y < H) {
+                    var alpha = Math.min(0.5, (adjZ - 10) / 200) * 0.5;
+                    ctx.globalAlpha = 0.5 - alpha;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(W, y);
+                    ctx.stroke();
+                }
+            }
+
+            // Vertical lines — converge to horizon centre
+            ctx.globalAlpha = 0.15;
+            var cx = W / 2;
+            for (var x = -2000; x <= 2000; x += 150) {
                 ctx.beginPath();
-                ctx.moveTo(topX, horizon);
-                ctx.lineTo(vp.x + fx, bottom);
-                ctx.globalAlpha = 0.5 + 0.5 * Math.sin(t * 1.8 + i * 0.5);
+                ctx.moveTo(cx, horizonY);
+                ctx.lineTo(cx + x, H);
                 ctx.stroke();
             }
 
-            // Horizontal lines (scrolling)
-            for (var j = 0; j < ROWS; j++) {
-                var p    = ((j / ROWS) + t * 0.35) % 1;
-                var y    = horizon + Math.pow(p, 2) * (bottom - horizon);
-                var frac = p;
-                ctx.beginPath();
-                ctx.moveTo(vp.x - spread / 2 * frac, y);
-                ctx.lineTo(vp.x + spread / 2 * frac, y);
-                ctx.globalAlpha = frac * 0.7;
-                ctx.stroke();
-            }
             ctx.globalAlpha = 1;
         })();
     }
@@ -272,16 +275,13 @@
             '  from { opacity:0; transform:translateY(14px); }',
             '  to   { opacity:1; transform:translateY(0); }',
             '}',
-            '@keyframes zbGlitch {',
-            '  0%,90%,100% { clip-path:none; transform:none; }',
-            '  91% { clip-path:inset(30% 0 40% 0); transform:translate(-3px,0); }',
-            '  93% { clip-path:inset(60% 0 10% 0); transform:translate( 3px,0); }',
-            '  95% { clip-path:inset(10% 0 70% 0); transform:translate(-2px,0); }',
-            '  97% { clip-path:none; transform:none; }',
+            '@keyframes zbPulseGlow {',
+            '  0%,100% { text-shadow:0 0 10px rgba(255,106,0,0.5),0 0 20px rgba(255,106,0,0.3); }',
+            '  50%     { text-shadow:0 0 20px rgba(255,106,0,0.8),0 0 40px rgba(255,106,0,0.5); }',
             '}',
             '@keyframes zbPulse {',
-            '  0%,100% { box-shadow:0 0 20px rgba(29,179,29,0.25),inset 0 0 20px rgba(29,179,29,0.06); }',
-            '  50%     { box-shadow:0 0 35px rgba(29,179,29,0.45),inset 0 0 30px rgba(29,179,29,0.12); }',
+            '  0%,100% { box-shadow:0 0 20px rgba(255,106,0,0.25),inset 0 0 20px rgba(255,106,0,0.06); }',
+            '  50%     { box-shadow:0 0 35px rgba(255,106,0,0.45),inset 0 0 30px rgba(255,106,0,0.12); }',
             '}',
             '#zb-menu * { font-family:"Segoe UI",Arial,sans-serif; box-sizing:border-box; }',
             '.zb-fadein  { animation: zbFadeUp 0.8s ease forwards; }',
@@ -290,20 +290,22 @@
             '.zb-d05     { animation-delay:0.6s; }',
             '.zb-d06     { animation-delay:0.72s; }',
             '.zb-d07     { animation-delay:0.85s; }',
-            '.zb-glitch  { animation: zbGlitch 5s infinite; }',
+            '.zb-pulse-glow { animation: zbPulseGlow 2s infinite ease-in-out; }',
             '#zb-play {',
             '  font-size:13px; font-weight:800; letter-spacing:7px; text-transform:uppercase;',
             '  color:rgba(255,255,255,0.5); background:transparent;',
-            '  border:1px solid rgba(29,179,29,0.3); padding:15px 68px;',
+            '  border:2px solid rgba(255,106,0,0.3); padding:16px 68px;',
             '  cursor:default; outline:none; transition:all 0.22s; pointer-events:none;',
             '}',
             '#zb-play.zb-ready {',
-            '  color:#fff; border-color:#1db31d; cursor:pointer; pointer-events:all;',
+            '  color:#FF6A00; border-color:#FF6A00; cursor:pointer; pointer-events:all;',
+            '  box-shadow:0 0 15px rgba(255,106,0,0.3) inset,0 0 15px rgba(255,106,0,0.3);',
             '  animation: zbPulse 2.4s ease-in-out infinite;',
             '}',
             '#zb-play.zb-ready:hover {',
-            '  background:rgba(29,179,29,0.14);',
-            '  box-shadow:0 0 45px rgba(29,179,29,0.5),inset 0 0 35px rgba(29,179,29,0.12);',
+            '  background:rgba(255,106,0,0.1);',
+            '  color:#fff;',
+            '  box-shadow:0 0 45px rgba(255,106,0,0.5),inset 0 0 35px rgba(255,106,0,0.12);',
             '  letter-spacing:10px;',
             '}',
             '#zb-play.zb-ready:active { transform:scale(0.97); }',
