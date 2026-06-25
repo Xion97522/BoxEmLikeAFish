@@ -1,0 +1,54 @@
+name: Build Desktop App
+
+# Builds unsigned Windows (.exe), macOS (.dmg), and Linux (.AppImage)
+# installers on every push to main, and uploads them as workflow artifacts.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            script: dist:win
+            artifact_name: windows-installer
+            artifact_path: release/*.exe
+          - os: macos-latest
+            script: dist:mac
+            artifact_name: macos-installer
+            artifact_path: release/*.dmg
+          - os: ubuntu-latest
+            script: dist:linux
+            artifact_name: linux-installer
+            artifact_path: release/*.AppImage
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build installer
+        run: npm run ${{ matrix.script }}
+        env:
+          # Unsigned builds: skip code signing / notarization on macOS.
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
